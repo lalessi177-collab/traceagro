@@ -736,6 +736,25 @@ function renderTraslado(){
   });
 }
 
+async function subirPDFTraslado(input, rowIdx){
+  const file = input.files[0];
+  if(!file) return;
+  showToast('Leyendo CP...', 3000);
+  try{
+    const datos = await parsePDF(file);
+    const bytes = await file.arrayBuffer();
+    pdfData['t'+rowIdx] = {name:(datos.nroCPE||file.name.replace('.pdf',''))+'.pdf', bytes};
+    const f = filasTraslado[rowIdx];
+    f.cp        = datos.nroCPE || f.cp;
+    f.chofer    = datos.chofer || f.chofer;
+    f.destino   = datos.destino || f.destino;
+    f.transporte= datos.transporte || f.transporte;
+    f.kg        = datos.kgNeto || f.kg;
+    renderTraslado();
+    showToast('✓ CP leída: '+datos.nroCPE);
+  }catch(e){ showToast('Error leyendo PDF'); console.error(e); }
+}
+
 function updT(i,campo,val){ filasTraslado[i][campo]=val; }
 function remT(i){ filasTraslado.splice(i,1); renderTraslado(); }
 
