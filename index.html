@@ -190,18 +190,18 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <div class="jornada-bar">
         <div class="field">
           <label>Establecimiento</label>
-          <select id="c-campo"></select>
+          <select id="c-campo" onchange="cambiarJornada()"></select>
         </div>
         <div class="field">
           <label>Cultivo</label>
-          <select id="c-cultivo">
+          <select id="c-cultivo" onchange="cambiarJornada()">
             <option>Girasol</option><option>Maíz</option><option>Maíz Tardío</option>
             <option>Soja de Primera</option><option>Soja de Segunda</option><option>Trigo</option>
           </select>
         </div>
         <div class="field">
           <label>Campaña</label>
-          <select id="c-campania"><option>25/26</option><option>26/27</option></select>
+          <select id="c-campania" onchange="cambiarJornada()"><option>25/26</option><option>26/27</option></select>
         </div>
         <div class="field">
           <label>Fecha</label>
@@ -422,6 +422,12 @@ function abrirModulo(mod){
 }
 
 // ── COSECHA ──
+function cambiarJornada(){
+  // Limpiar filas y cargar datos del nuevo campo/cultivo/campaña
+  filasCosecha = [];
+  cargarCosechaDeSheets();
+}
+
 function agregarFilaCosecha(data){
   const id = Date.now() + Math.random();
   const f = data || {
