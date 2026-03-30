@@ -176,12 +176,14 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
     <datalist id="dl-contrato"></datalist>
     <datalist id="dl-contratista"></datalist>
     <datalist id="dl-chofer"></datalist>
+    <datalist id="dl-embolso"></datalist>
     <datalist id="dl-silo"></datalist>
     <datalist id="dl-lotes"></datalist>
     <datalist id="dl-variedad"></datalist>
     <datalist id="dl-contrato"></datalist>
     <datalist id="dl-contratista"></datalist>
     <datalist id="dl-chofer"></datalist>
+    <datalist id="dl-embolso"></datalist>
     <datalist id="dl-silo"></datalist>
     <div id="panel-cosecha" class="hidden">
       <!-- Jornada -->
@@ -463,12 +465,12 @@ function renderCosecha(){
         </select>
       </td>
       <td id="cp-td-${i}">
-        <input value="${f.cpSilo||''}" placeholder="${f.destino==='cam'?'N° CP':f.destino==='silo'?'Nombre silo':'Destino'}" onchange="updF(${i},'cpSilo',this.value)" style="width:${f.destino==='cam'?'78':'120'}px"/>
+        <input value="${f.cpSilo||''}" placeholder="${f.destino==='cam'?'N° CP':f.destino==='silo'?'Nombre silo':'Destino'}" onchange="updF(${i},'cpSilo',this.value)" style="width:${f.destino==='cam'?'110':'140'}px"/>
         ${f.destino==='cam'?'<label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF"><input type="file" accept=".pdf" style="display:none" onchange="subirPDFCosecha(this,'+i+')"/>PDF</label>':''}
         ${pdfData[i]?'<span style="color:#3B6D11;font-size:11px"> ✓</span>':''}
       </td>
       <td><input value="${f.chofer||''}" onchange="updF(${i},'chofer',this.value)" list="dl-chofer" style="width:105px"/></td>
-      <td><input value="${f.embolso||''}" onchange="updF(${i},'embolso',this.value)" style="width:75px"/></td>
+      <td><input value="${f.embolso||''}" onchange="updF(${i},'embolso',this.value)" list="dl-embolso" style="width:75px"/></td>
       <td><input value="${f.contratista||''}" onchange="updF(${i},'contratista',this.value)" list="dl-contratista" style="width:105px"/></td>
       <td><button onclick="remF(${i})" style="background:none;border:none;color:#E24B4A;cursor:pointer;font-size:14px">✕</button></td>
     `;
@@ -487,6 +489,7 @@ function actualizarDataLists(){
     'dl-contrato':  filasCosecha.map(f=>f.contrato),
     'dl-contratista': filasCosecha.map(f=>f.contratista),
     'dl-chofer':    filasCosecha.map(f=>f.chofer),
+    'dl-embolso':   filasCosecha.map(f=>f.embolso),
     'dl-silo':      filasCosecha.filter(f=>f.destino==='silo').map(f=>f.cpSilo)
   };
   Object.entries(campos).forEach(([id, vals])=>{
@@ -844,15 +847,27 @@ async function parsePDF(file) {
   const chofer       = nombre(byLabel('Chofer'));
   const contrato     = byLabel('Contrato').split(' ')[0] || '';
   
+  // Pesos — buscar en líneas específicas con números razonables (1000-99999 kg)
   let kgBruto=0, kgTara=0, kgNeto=0;
   for(const r of rows){
-    if(r.full.includes('Peso Bruto') && r.full.includes('Peso Tara')){
-      const nums = r.full.match(/\d+/g);
-      if(nums && nums.length>=2){ kgBruto=parseInt(nums[0]); kgTara=parseInt(nums[1]); }
+    const line = r.full;
+    if(line.includes('Peso Bruto') && line.includes('Peso Tara')){
+      // Extraer números entre 1000 y 999999 kg
+      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
+      if(nums.length>=2){ kgBruto=nums[0]; kgTara=nums[1]; }
+      else if(nums.length===1){ kgBruto=nums[0]; }
     }
-    if(r.full.includes('Peso Neto') && !r.full.includes('Peso Bruto')){
-      const nums = r.full.match(/\d+/g);
-      if(nums) kgNeto=parseInt(nums[0]);
+    if(line.includes('Peso Bruto') && !line.includes('Peso Tara')){
+      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
+      if(nums.length) kgBruto=nums[0];
+    }
+    if(line.includes('Peso Tara') && !line.includes('Peso Bruto')){
+      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
+      if(nums.length) kgTara=nums[0];
+    }
+    if(line.includes('Peso Neto') && !line.includes('Peso Bruto')){
+      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
+      if(nums.length) kgNeto=nums[0];
     }
   }
   if(!kgNeto && kgBruto && kgTara) kgNeto = kgBruto - kgTara;
