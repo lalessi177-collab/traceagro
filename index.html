@@ -729,13 +729,13 @@ function agregarFilaTraslado(data){
 function renderTraslado(){
   const tbody = document.getElementById('tbody-traslado');
   tbody.innerHTML='';
-  const silosOpts = Object.keys(silosStock).map(n=>`<option value="${n}">${n}</option>`).join('');
+  const silosOpts = Object.keys(silosStock).map(n=>`<option value="${n}" ${f && f.silo===n?'selected':''}>${n}</option>`).join('');
   filasTraslado.forEach((f,i)=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td><input value="${f.fecha||''}" onchange="updT(${i},'fecha',this.value)" style="width:80px"/></td>
       <td>
-        <select onchange="updT(${i},'silo',this.value);renderTraslado()" style="width:155px">
+        <select onchange="updT(${i},'silo',this.value)" style="width:155px">
           <option value="">— Seleccionar —</option>
           ${silosOpts}
           <option value="__manual__" ${f.silo&&!silosStock[f.silo]?'selected':''}>Otro (manual)</option>
