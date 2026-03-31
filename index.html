@@ -285,6 +285,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
           <label>Fecha</label>
           <input type="text" id="t-fecha" style="width:110px"/>
         </div>
+        <button class="btn btn-blue btn-sm" onclick="cargarStockSilos()">🔄 Cargar silos</button>
         <button class="btn btn-gray btn-sm" onclick="volverMenu()">← Menú</button>
       </div>
 
@@ -713,7 +714,8 @@ async function cargarStockSilos(){
   }catch(e){
     grid.innerHTML='<div style="font-size:12px;color:#888">Sin conexión a Sheets.</div>';
   }
-  if(!filasTraslado.length) agregarFilaTraslado();
+  filasTraslado = [];
+  agregarFilaTraslado();
   renderTraslado();
 }
 
