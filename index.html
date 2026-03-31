@@ -190,7 +190,11 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <div class="jornada-bar">
         <div class="field">
           <label>Establecimiento</label>
-          <select id="c-campo" onchange="cambiarJornada()"></select>
+          <div style="display:flex;gap:4px;align-items:center">
+            <select id="c-campo"></select>
+            <input id="c-campo-nuevo" type="text" placeholder="Nombre..." style="display:none;width:130px;border:1px solid #3B6D11;border-radius:6px;padding:5px 8px;font-size:13px"
+              onkeydown="if(event.key==='Enter')confirmarCampoNuevo('c')" onblur="confirmarCampoNuevo('c')"/>
+          </div>
         </div>
         <div class="field">
           <label>Cultivo</label>
@@ -268,7 +272,11 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <div class="jornada-bar">
         <div class="field">
           <label>Establecimiento</label>
-          <select id="t-campo"></select>
+          <div style="display:flex;gap:4px;align-items:center">
+            <select id="t-campo"></select>
+            <input id="t-campo-nuevo" type="text" placeholder="Nombre..." style="display:none;width:130px;border:1px solid #534AB7;border-radius:6px;padding:5px 8px;font-size:13px"
+              onkeydown="if(event.key==='Enter')confirmarCampoNuevo('t')" onblur="confirmarCampoNuevo('t')"/>
+          </div>
         </div>
         <div class="field">
           <label>Cultivo</label>
@@ -351,47 +359,38 @@ function saveCampos(lista){
 }
 function poblarSelectsCampo(){
   const lista = getCampos();
-  ['c-campo','t-campo'].forEach(id=>{
-    const sel = document.getElementById(id);
+  ['c','t'].forEach(prefix=>{
+    const sel = document.getElementById(prefix+'-campo');
     if(!sel) return;
     const current = sel.value;
     sel.innerHTML = lista.map(c=>`<option value="${c}">${c}</option>`).join('')
       + `<option value="__nuevo__">+ Agregar...</option>`;
     if(current && lista.includes(current)) sel.value = current;
     sel.onchange = function(){
-      if(this.value === '__nuevo__'){
-        // Mostrar input inline
-        mostrarInputCampo(id);
+      if(this.value==='__nuevo__'){
         this.value = lista[0]||'';
+        const inp = document.getElementById(prefix+'-campo-nuevo');
+        inp.style.display='inline-block';
+        inp.value='';
+        inp.focus();
       } else {
-        if(id==='c-campo') cambiarJornada();
+        if(prefix==='c') cambiarJornada();
       }
     };
   });
 }
-function mostrarInputCampo(selectId){
-  const sel = document.getElementById(selectId);
-  const input = document.createElement('input');
-  input.placeholder = 'Nombre del establecimiento';
-  input.style.cssText = 'border:1px solid #3B6D11;border-radius:6px;padding:5px 8px;font-size:13px;width:160px;margin-left:6px';
-  sel.parentNode.appendChild(input);
-  input.focus();
-  function confirmar(){
-    const nombre = input.value.trim();
-    if(nombre){
-      const lista = getCampos();
-      if(!lista.includes(nombre)){
-        lista.push(nombre);
-        saveCampos(lista);
-      }
-      poblarSelectsCampo();
-      document.getElementById(selectId).value = nombre;
-      if(selectId==='c-campo') cambiarJornada();
-    }
-    input.remove();
-  }
-  input.onblur = confirmar;
-  input.onkeydown = e=>{ if(e.key==='Enter') confirmar(); if(e.key==='Escape') input.remove(); };
+function confirmarCampoNuevo(prefix){
+  const inp = document.getElementById(prefix+'-campo-nuevo');
+  const nombre = inp.value.trim();
+  inp.style.display='none';
+  if(!nombre) return;
+  const lista = getCampos();
+  if(!lista.includes(nombre)) lista.push(nombre);
+  saveCampos(lista);
+  poblarSelectsCampo();
+  document.getElementById(prefix+'-campo').value = nombre;
+  if(prefix==='c') cambiarJornada();
+  showToast('✓ '+nombre+' agregado');
 }
 const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15:1.73,15.5:2.31,16:2.89,16.5:3.47,17:4.05,17.5:4.62,18:5.2,18.5:5.78,19:6.36,19.5:6.94,20:7.51};
 
