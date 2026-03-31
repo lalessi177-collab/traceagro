@@ -340,64 +340,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 // ── CONFIG ──
 const PASS = 'estanar2526';
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzhuL4E_fsvW5RjNh9bSXdrayld8a_f4Xd9hwKDJaEbt3ZnjpxZj6aaPDuWYLeGIi6f0g/exec';
-function getCampos(){
-  const u = localStorage.getItem('ta_usuario')||'default';
-  const saved = localStorage.getItem('ta_campos_'+u);
-  return saved ? JSON.parse(saved) : [];
-}
-function saveCampos(lista){
-  const u = localStorage.getItem('ta_usuario')||'default';
-  localStorage.setItem('ta_campos_'+u, JSON.stringify(lista));
-}
-function poblarSelectsCampo(){
-  const lista = getCampos();
-  ['c','t'].forEach(prefix=>{
-    const sel = document.getElementById(prefix+'-campo');
-    if(!sel) return;
-    const current = sel.value;
-    sel.innerHTML = lista.map(c=>`<option value="${c}">${c}</option>`).join('')
-      + `<option value="__nuevo__">+ Agregar...</option>`;
-    if(current && lista.includes(current)) sel.value = current;
-    sel.onchange = function(){
-      if(this.value==='__nuevo__'){
-        this.value = lista[0]||'';
-        confirmarCampoNuevo(prefix);
-      } else {
-        if(prefix==='c') cambiarJornada();
-      }
-    };
-  });
-}
-function confirmarCampoNuevo(prefix){
-  const sel = document.getElementById(prefix+'-campo');
-  // Ocultar select y mostrar input en su lugar
-  sel.style.display='none';
-  const inp = document.createElement('input');
-  inp.type='text';
-  inp.placeholder='Nombre del establecimiento';
-  inp.style.cssText='border:1px solid #3B6D11;border-radius:6px;padding:5px 8px;font-size:13px;width:160px';
-  inp.id = prefix+'-campo-inp-temp';
-  sel.parentNode.insertBefore(inp, sel);
-  setTimeout(()=>inp.focus(), 50);
-  function guardar(){
-    const nombre = inp.value.trim();
-    inp.remove();
-    sel.style.display='';
-    if(!nombre){ poblarSelectsCampo(); return; }
-    const lista = getCampos();
-    if(!lista.includes(nombre)) lista.push(nombre);
-    saveCampos(lista);
-    poblarSelectsCampo();
-    document.getElementById(prefix+'-campo').value = nombre;
-    if(prefix==='c') cambiarJornada();
-    showToast('✓ '+nombre+' agregado');
-  }
-  inp.onkeydown = e=>{
-    if(e.key==='Enter'){ e.preventDefault(); guardar(); }
-    if(e.key==='Escape'){ inp.remove(); sel.style.display=''; poblarSelectsCampo(); }
-  };
-  inp.onblur = ()=>setTimeout(guardar, 150);
-}
+const CAMPOS = ['Algimar','La Mañana','La Querencia','San Lorenzo'];
 const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15:1.73,15.5:2.31,16:2.89,16.5:3.47,17:4.05,17.5:4.62,18:5.2,18.5:5.78,19:6.36,19.5:6.94,20:7.51};
 
 // ── STATE ──
@@ -444,7 +387,10 @@ function iniciarApp(){
   document.getElementById('screen-app').classList.remove('hidden');
   document.getElementById('topbar-user').textContent = usuario;
   // Poblar campos
-  poblarSelectsCampo();
+  ['c-campo','t-campo'].forEach(id=>{
+    const sel = document.getElementById(id);
+    sel.innerHTML = CAMPOS.map(c=>`<option>${c}</option>`).join('');
+  });
   // Fecha hoy
   document.getElementById('c-fecha').value = hoy();
   document.getElementById('t-fecha').value = hoy();
