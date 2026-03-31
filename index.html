@@ -339,7 +339,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 // ── CONFIG ──
 const PASS = 'estanar2526';
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzUcn9Bh0ComtVVnChoxKP5SuWK7ywhK575DgJeIeiSko929h0jBnXHTPSUisRHUP11IQ/exec';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzhuL4E_fsvW5RjNh9bSXdrayld8a_f4Xd9hwKDJaEbt3ZnjpxZj6aaPDuWYLeGIi6f0g/exec';
 const CAMPOS = ['Algimar'];
 const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15:1.73,15.5:2.31,16:2.89,16.5:3.47,17:4.05,17.5:4.62,18:5.2,18.5:5.78,19:6.36,19.5:6.94,20:7.51};
 
@@ -827,26 +827,31 @@ function exportarExcelTraslado(){
   const campo=document.getElementById('t-campo').value;
   const cultivo=document.getElementById('t-cultivo').value;
   const camp=document.getElementById('t-campania').value;
-  // Sincronizar datos desde el DOM antes de exportar
-  document.querySelectorAll('#tbody-traslado tr').forEach((tr,i)=>{
-    if(!filasTraslado[i]) return;
-    const sel = tr.querySelector('select');
-    const inputs = tr.querySelectorAll('input');
-    if(sel) filasTraslado[i].silo = sel.value !== '__manual__' ? sel.value : (inputs[1]?.value||filasTraslado[i].silo);
-    if(inputs[0]) filasTraslado[i].fecha = inputs[0].value;
-    if(inputs[1]) filasTraslado[i].kg = inputs[1].value;
-  });
   const wb=XLSX.utils.book_new();
+
+  // ── Hoja 1: Detalle de traslados ──
   const rows=[];
   rows.push([`TRASLADOS DESDE SILO BOLSA — ${cultivo.toUpperCase()} ${campo.toUpperCase()} ${camp}`]);
   rows.push([`Técnico: ${usuario}`,``,``,``,`Fecha: ${hoy()}`]);
   rows.push([]);
   rows.push(['Fecha','Silo de origen','Kg','Carta de Porte','Destino','Chofer','Contrato','Transportista']);
-  filasTraslado.forEach(f=>{ rows.push([f.fecha,f.silo,parseFloat(f.kg)||0,f.cp,f.destino,f.chofer,f.contrato,f.transporte]); });
+  filasTraslado.forEach(f=>{
+    if(!f.silo && !f.kg) return;
+    rows.push([f.fecha, f.silo, parseFloat(f.kg)||0, f.cp||'', f.destino||'', f.chofer||'', f.contrato||'', f.transporte||'']);
+  });
   const total=filasTraslado.reduce((s,f)=>s+(parseFloat(f.kg)||0),0);
   rows.push(['TOTAL','',total,'','','','','']);
+  rows.push([]);
+
+  // ── Cuenta corriente por silo ──
+  rows.push(['CUENTA CORRIENTE SILO BOLSA']);
+  rows.push(['Silo','Entrada (kg)','Salida (kg)','Saldo disponible (kg)']);
+  Object.entries(silosStock).forEach(([n,s])=>{
+    rows.push([n, s.entrada, s.salida, s.entrada-s.salida]);
+  });
+
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:12},{wch:24},{wch:10},{wch:16},{wch:20},{wch:18},{wch:10},{wch:16}];
+  ws['!cols']=[{wch:12},{wch:24},{wch:12},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20}];
   XLSX.utils.book_append_sheet(wb,ws,'Traslados');
   XLSX.writeFile(wb,`Traslados_${campo}_${cultivo}_${camp.replace('/','_')}_${hoy().replace(/\//g,'-')}.xlsx`);
   showToast('✓ Excel descargado');
