@@ -340,7 +340,51 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 // ── CONFIG ──
 const PASS = 'estanar2526';
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzhuL4E_fsvW5RjNh9bSXdrayld8a_f4Xd9hwKDJaEbt3ZnjpxZj6aaPDuWYLeGIi6f0g/exec';
-const CAMPOS = ['Algimar'];
+const CAMPOS_DEFAULT = [];
+function getCampos(){
+  const u = localStorage.getItem('ta_usuario')||'default';
+  const saved = localStorage.getItem('ta_campos_'+u);
+  return saved ? JSON.parse(saved) : [];
+}
+function saveCampos(lista){
+  const u = localStorage.getItem('ta_usuario')||'default';
+  localStorage.setItem('ta_campos_'+u, JSON.stringify(lista));
+}
+function agregarCampoNuevo(){
+  const nombre = prompt('Nombre del establecimiento:');
+  if(!nombre || !nombre.trim()) return;
+  const lista = getCampos();
+  if(lista.includes(nombre.trim())){ showToast('Ya existe ese campo'); return; }
+  lista.push(nombre.trim());
+  saveCampos(lista);
+  poblarSelectsCampo();
+  // Seleccionar el nuevo en ambos selects
+  ['c-campo','t-campo'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(sel) sel.value = nombre.trim();
+  });
+  showToast('✓ Campo "'+nombre.trim()+'" agregado');
+}
+function poblarSelectsCampo(){
+  const lista = getCampos();
+  ['c-campo','t-campo'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const current = sel.value;
+    sel.innerHTML = lista.map(c=>`<option value="${c}">${c}</option>`).join('')
+      + `<option value="__nuevo__">+ Agregar campo...</option>`;
+    if(current && lista.includes(current)) sel.value = current;
+    // Listener para detectar "+ Agregar"
+    sel.onchange = function(){
+      if(this.value === '__nuevo__'){
+        agregarCampoNuevo();
+        this.value = getCampos()[0]||'';
+      } else {
+        if(id==='c-campo') cambiarJornada();
+      }
+    };
+  });
+}
 const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15:1.73,15.5:2.31,16:2.89,16.5:3.47,17:4.05,17.5:4.62,18:5.2,18.5:5.78,19:6.36,19.5:6.94,20:7.51};
 
 // ── STATE ──
@@ -387,10 +431,10 @@ function iniciarApp(){
   document.getElementById('screen-app').classList.remove('hidden');
   document.getElementById('topbar-user').textContent = usuario;
   // Poblar campos
-  ['c-campo','t-campo'].forEach(id=>{
-    const sel = document.getElementById(id);
-    sel.innerHTML = CAMPOS.map(c=>`<option>${c}</option>`).join('');
-  });
+  poblarSelectsCampo();
+  if(!getCampos().length){
+    setTimeout(()=>agregarCampoNuevo(), 300);
+  }
   // Fecha hoy
   document.getElementById('c-fecha').value = hoy();
   document.getElementById('t-fecha').value = hoy();
