@@ -310,7 +310,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
                 <th style="width:140px">Carta de Porte</th>
                 <th style="width:140px">Destino</th>
                 <th style="width:110px">Chofer</th>
-                <th style="width:90px">Patente</th>
+                <th style="width:90px">Contrato</th>
                 <th style="width:110px">Transportista</th>
                 <th style="width:30px"></th>
               </tr>
@@ -339,7 +339,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 // ── CONFIG ──
 const PASS = 'estanar2526';
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwyM9oAxGU5Ub8iF7RXyD9JCFPoxt8fR6Mexqiwl-4EBe927auUHvXLI31LxJI7z1pdUQ/exec';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzUcn9Bh0ComtVVnChoxKP5SuWK7ywhK575DgJeIeiSko929h0jBnXHTPSUisRHUP11IQ/exec';
 const CAMPOS = ['Algimar'];
 const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15:1.73,15.5:2.31,16:2.89,16.5:3.47,17:4.05,17.5:4.62,18:5.2,18.5:5.78,19:6.36,19.5:6.94,20:7.51};
 
@@ -726,7 +726,7 @@ async function cargarStockSilos(){
 function agregarFilaTraslado(data){
   filasTraslado.push(data||{
     fecha: document.getElementById('t-fecha').value,
-    silo:'', kg:'', cp:'', destino:'', chofer:'', patente:'', transporte:''
+    silo:'', kg:'', cp:'', destino:'', chofer:'', contrato:'', transporte:''
   });
   renderTraslado();
 }
@@ -757,7 +757,7 @@ function renderTraslado(){
       </td>
       <td><input value="${f.destino||''}" placeholder="Puerto..." onchange="updT(${i},'destino',this.value)" style="width:135px"/></td>
       <td><input value="${f.chofer||''}" onchange="updT(${i},'chofer',this.value)" style="width:105px"/></td>
-      <td><input value="${f.patente||''}" onchange="updT(${i},'patente',this.value)" style="width:85px"/></td>
+      <td><input value="${f.contrato||''}" onchange="updT(${i},'contrato',this.value)" style="width:85px"/></td>
       <td><input value="${f.transporte||''}" onchange="updT(${i},'transporte',this.value)" style="width:105px"/></td>
       <td><button onclick="remT(${i})" style="background:none;border:none;color:#E24B4A;cursor:pointer;font-size:14px">✕</button></td>
     `;
@@ -801,7 +801,7 @@ async function guardarTraslado(){
       campo,cultivo,campania:camp,tecnico:usuario,
       fecha:f.fecha||'',silo:f.silo||'',kg:f.kg||0,
       cp:f.cp||'',destino:f.destino||'',
-      chofer:f.chofer||'',patente:f.patente||'',transporte:f.transporte||''
+      chofer:f.chofer||'',contrato:f.contrato||'',transporte:f.transporte||''
     });
     try{
       await fetch(SHEETS_URL+'?'+params.toString(),{method:'GET',mode:'no-cors'});
@@ -827,13 +827,22 @@ function exportarExcelTraslado(){
   const campo=document.getElementById('t-campo').value;
   const cultivo=document.getElementById('t-cultivo').value;
   const camp=document.getElementById('t-campania').value;
+  // Sincronizar datos desde el DOM antes de exportar
+  document.querySelectorAll('#tbody-traslado tr').forEach((tr,i)=>{
+    if(!filasTraslado[i]) return;
+    const sel = tr.querySelector('select');
+    const inputs = tr.querySelectorAll('input');
+    if(sel) filasTraslado[i].silo = sel.value !== '__manual__' ? sel.value : (inputs[1]?.value||filasTraslado[i].silo);
+    if(inputs[0]) filasTraslado[i].fecha = inputs[0].value;
+    if(inputs[1]) filasTraslado[i].kg = inputs[1].value;
+  });
   const wb=XLSX.utils.book_new();
   const rows=[];
   rows.push([`TRASLADOS DESDE SILO BOLSA — ${cultivo.toUpperCase()} ${campo.toUpperCase()} ${camp}`]);
   rows.push([`Técnico: ${usuario}`,``,``,``,`Fecha: ${hoy()}`]);
   rows.push([]);
-  rows.push(['Fecha','Silo de origen','Kg','Carta de Porte','Destino','Chofer','Patente','Transportista']);
-  filasTraslado.forEach(f=>{ rows.push([f.fecha,f.silo,parseFloat(f.kg)||0,f.cp,f.destino,f.chofer,f.patente,f.transporte]); });
+  rows.push(['Fecha','Silo de origen','Kg','Carta de Porte','Destino','Chofer','Contrato','Transportista']);
+  filasTraslado.forEach(f=>{ rows.push([f.fecha,f.silo,parseFloat(f.kg)||0,f.cp,f.destino,f.chofer,f.contrato,f.transporte]); });
   const total=filasTraslado.reduce((s,f)=>s+(parseFloat(f.kg)||0),0);
   rows.push(['TOTAL','',total,'','','','','']);
   const ws=XLSX.utils.aoa_to_sheet(rows);
