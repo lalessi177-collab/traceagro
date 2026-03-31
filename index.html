@@ -711,12 +711,12 @@ async function cargarStockSilos(){
         </div>`;
       }).join('');
     }
+    filasTraslado = [];
+    agregarFilaTraslado();
+    renderTraslado();
   }catch(e){
     grid.innerHTML='<div style="font-size:12px;color:#888">Sin conexión a Sheets.</div>';
   }
-  filasTraslado = [];
-  agregarFilaTraslado();
-  renderTraslado();
 }
 
 // ── TRASLADOS ──
