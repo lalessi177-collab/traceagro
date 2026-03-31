@@ -858,7 +858,7 @@ async function exportarExcelTraslado(){
     rows.push([
       f['Fecha']||'', f['Técnico']||'', f['Silo de origen']||'',
       kg, f['Carta de Porte']||'', f['Destino']||'',
-      f['Chofer']||'', f['Contrato']||'', f['Transportista']||''
+      f['Chofer']||'', f['Contrato']||f['Patente']||'', f['Transportista']||''
     ]);
   });
   rows.push(['TOTAL','','',total,'','','','','']);
