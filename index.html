@@ -823,27 +823,48 @@ function exportarExcelCosecha(){
   XLSX.writeFile(wb,fname);
   showToast('✓ Excel descargado');
 }
-function exportarExcelTraslado(){
+async function exportarExcelTraslado(){
   const campo=document.getElementById('t-campo').value;
   const cultivo=document.getElementById('t-cultivo').value;
   const camp=document.getElementById('t-campania').value;
-  const wb=XLSX.utils.book_new();
+  showToast('Descargando historial desde Sheets...', 4000);
 
-  // ── Hoja 1: Detalle de traslados ──
+  // Traer historial completo desde Sheets
+  let historial = [];
+  try{
+    const params = new URLSearchParams({action:'read_traslados',campo,cultivo,campania:camp});
+    const resp = await fetch(SHEETS_URL+'?'+params.toString());
+    const data = await resp.json();
+    if(data.ok && data.filas) historial = data.filas;
+  }catch(e){
+    // Si falla Sheets, usar los datos locales
+    historial = filasTraslado.map(f=>({
+      'Fecha':f.fecha,'Silo de origen':f.silo,'Kg':f.kg,
+      'Carta de Porte':f.cp,'Destino':f.destino,'Chofer':f.chofer,
+      'Contrato':f.contrato,'Transportista':f.transporte
+    }));
+  }
+
+  const wb=XLSX.utils.book_new();
   const rows=[];
   rows.push([`TRASLADOS DESDE SILO BOLSA — ${cultivo.toUpperCase()} ${campo.toUpperCase()} ${camp}`]);
-  rows.push([`Técnico: ${usuario}`,``,``,``,`Fecha: ${hoy()}`]);
+  rows.push([`Descarga: ${hoy()}`,'','','','','','','']);
   rows.push([]);
-  rows.push(['Fecha','Silo de origen','Kg','Carta de Porte','Destino','Chofer','Contrato','Transportista']);
-  filasTraslado.forEach(f=>{
-    if(!f.silo && !f.kg) return;
-    rows.push([f.fecha, f.silo, parseFloat(f.kg)||0, f.cp||'', f.destino||'', f.chofer||'', f.contrato||'', f.transporte||'']);
+  rows.push(['Fecha','Técnico','Silo de origen','Kg','Carta de Porte','Destino','Chofer','Contrato','Transportista']);
+  let total=0;
+  historial.forEach(f=>{
+    const kg = parseFloat(f['Kg'])||0;
+    total += kg;
+    rows.push([
+      f['Fecha']||'', f['Técnico']||'', f['Silo de origen']||'',
+      kg, f['Carta de Porte']||'', f['Destino']||'',
+      f['Chofer']||'', f['Contrato']||'', f['Transportista']||''
+    ]);
   });
-  const total=filasTraslado.reduce((s,f)=>s+(parseFloat(f.kg)||0),0);
-  rows.push(['TOTAL','',total,'','','','','']);
+  rows.push(['TOTAL','','',total,'','','','','']);
   rows.push([]);
 
-  // ── Cuenta corriente por silo ──
+  // Cuenta corriente por silo
   rows.push(['CUENTA CORRIENTE SILO BOLSA']);
   rows.push(['Silo','Entrada (kg)','Salida (kg)','Saldo disponible (kg)']);
   Object.entries(silosStock).forEach(([n,s])=>{
@@ -851,10 +872,10 @@ function exportarExcelTraslado(){
   });
 
   const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:12},{wch:24},{wch:12},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20}];
+  ws['!cols']=[{wch:12},{wch:16},{wch:24},{wch:12},{wch:18},{wch:24},{wch:20},{wch:14},{wch:20}];
   XLSX.utils.book_append_sheet(wb,ws,'Traslados');
   XLSX.writeFile(wb,`Traslados_${campo}_${cultivo}_${camp.replace('/','_')}_${hoy().replace(/\//g,'-')}.xlsx`);
-  showToast('✓ Excel descargado');
+  showToast('✓ Excel descargado con '+historial.length+' traslados');
 }
 
 
