@@ -190,11 +190,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <div class="jornada-bar">
         <div class="field">
           <label>Establecimiento</label>
-          <div style="display:flex;gap:4px;align-items:center">
-            <select id="c-campo"></select>
-            <input id="c-campo-nuevo" type="text" placeholder="Nombre..." style="display:none;width:130px;border:1px solid #3B6D11;border-radius:6px;padding:5px 8px;font-size:13px"
-              onkeydown="if(event.key==='Enter')confirmarCampoNuevo('c')" onblur="confirmarCampoNuevo('c')"/>
-          </div>
+          <select id="c-campo"></select>
         </div>
         <div class="field">
           <label>Cultivo</label>
@@ -272,11 +268,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <div class="jornada-bar">
         <div class="field">
           <label>Establecimiento</label>
-          <div style="display:flex;gap:4px;align-items:center">
-            <select id="t-campo"></select>
-            <input id="t-campo-nuevo" type="text" placeholder="Nombre..." style="display:none;width:130px;border:1px solid #534AB7;border-radius:6px;padding:5px 8px;font-size:13px"
-              onkeydown="if(event.key==='Enter')confirmarCampoNuevo('t')" onblur="confirmarCampoNuevo('t')"/>
-          </div>
+          <select id="t-campo"></select>
         </div>
         <div class="field">
           <label>Cultivo</label>
@@ -369,10 +361,7 @@ function poblarSelectsCampo(){
     sel.onchange = function(){
       if(this.value==='__nuevo__'){
         this.value = lista[0]||'';
-        const inp = document.getElementById(prefix+'-campo-nuevo');
-        inp.style.display='inline-block';
-        inp.value='';
-        inp.focus();
+        confirmarCampoNuevo(prefix);
       } else {
         if(prefix==='c') cambiarJornada();
       }
@@ -380,17 +369,34 @@ function poblarSelectsCampo(){
   });
 }
 function confirmarCampoNuevo(prefix){
-  const inp = document.getElementById(prefix+'-campo-nuevo');
-  const nombre = inp.value.trim();
-  inp.style.display='none';
-  if(!nombre) return;
-  const lista = getCampos();
-  if(!lista.includes(nombre)) lista.push(nombre);
-  saveCampos(lista);
-  poblarSelectsCampo();
-  document.getElementById(prefix+'-campo').value = nombre;
-  if(prefix==='c') cambiarJornada();
-  showToast('✓ '+nombre+' agregado');
+  const sel = document.getElementById(prefix+'-campo');
+  // Ocultar select y mostrar input en su lugar
+  sel.style.display='none';
+  const inp = document.createElement('input');
+  inp.type='text';
+  inp.placeholder='Nombre del establecimiento';
+  inp.style.cssText='border:1px solid #3B6D11;border-radius:6px;padding:5px 8px;font-size:13px;width:160px';
+  inp.id = prefix+'-campo-inp-temp';
+  sel.parentNode.insertBefore(inp, sel);
+  setTimeout(()=>inp.focus(), 50);
+  function guardar(){
+    const nombre = inp.value.trim();
+    inp.remove();
+    sel.style.display='';
+    if(!nombre){ poblarSelectsCampo(); return; }
+    const lista = getCampos();
+    if(!lista.includes(nombre)) lista.push(nombre);
+    saveCampos(lista);
+    poblarSelectsCampo();
+    document.getElementById(prefix+'-campo').value = nombre;
+    if(prefix==='c') cambiarJornada();
+    showToast('✓ '+nombre+' agregado');
+  }
+  inp.onkeydown = e=>{
+    if(e.key==='Enter'){ e.preventDefault(); guardar(); }
+    if(e.key==='Escape'){ inp.remove(); sel.style.display=''; poblarSelectsCampo(); }
+  };
+  inp.onblur = ()=>setTimeout(guardar, 150);
 }
 const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15:1.73,15.5:2.31,16:2.89,16.5:3.47,17:4.05,17.5:4.62,18:5.2,18.5:5.78,19:6.36,19.5:6.94,20:7.51};
 
