@@ -739,6 +739,7 @@ async function guardarCosecha(){
   }
 
   let guardadas = 0;
+  let erroresCosecha = [];
   for(let i=0;i<filasCosecha.length;i++){
     const f = filasCosecha[i];
     if(!f.kgH) continue;
@@ -754,18 +755,29 @@ async function guardarCosecha(){
       contratista: f.contratista||''
     });
     try{
-      await fetch(SHEETS_URL+'?'+params.toString());
-      guardadas++;
+      const resp = await fetch(SHEETS_URL+'?'+params.toString());
+      const data = await resp.json();
+      if(data.error === 'CP_EN_TRASLADO'){
+        erroresCosecha.push(`${f.cpSilo} (ya en Traslado Asiento #${data.asientoExistente||'?'})`);
+      } else if(data.skipped){
+        erroresCosecha.push(`${f.cpSilo} (ya en Cosecha Asiento #${data.asientoExistente||'?'})`);
+      } else {
+        guardadas++;
+      }
       await new Promise(r=>setTimeout(r,500));
     }catch(e){ console.warn(e); }
   }
-  // Marcar todas como guardadas
   filasCosecha.forEach(f=>{ if(f.kgH) f.savedToSheets = true; });
   guardarLocal();
-  const msg = `✓ Asiento #${asientoActual} guardado (${guardadas} filas)`;
+  let msg = `✓ Asiento #${asientoActual} guardado (${guardadas} filas)`;
+  if(erroresCosecha.length){
+    msg += ` — ⚠️ CP ya en traslados: ${erroresCosecha.join(', ')}`;
+    showToast('⚠️ CP duplicada con traslados: '+erroresCosecha.join(', '), 5000);
+  } else {
+    showToast(msg);
+  }
   est.textContent = msg + ' — ' + new Date().toLocaleTimeString('es-AR');
   actualizarBadgeAsiento();
-  showToast(msg);
 }
 
 async function cargarCosechaDeSheets(){
@@ -964,6 +976,7 @@ async function guardarTraslado(){
   }
 
   let guardadas = 0;
+  let errores = [];
   for(let i=0;i<filasTraslado.length;i++){
     const f=filasTraslado[i];
     if(!f.kg||!f.silo) continue;
@@ -976,12 +989,25 @@ async function guardarTraslado(){
       chofer:f.chofer||'',contrato:f.contrato||'',transporte:f.transporte||''
     });
     try{
-      await fetch(SHEETS_URL+'?'+params.toString());
-      guardadas++;
+      const resp = await fetch(SHEETS_URL+'?'+params.toString());
+      const data = await resp.json();
+      if(data.error === 'CP_EN_COSECHA'){
+        errores.push(`${f.cp} (Asiento Cosecha #${data.asientoExistente||'?'})`);
+      } else if(data.skipped){
+        errores.push(`${f.cp} (Asiento Traslado #${data.asientoExistente||'?'})`);
+      } else {
+        guardadas++;
+      }
       await new Promise(r=>setTimeout(r,500));
     }catch(e){ console.warn(e); }
   }
-  const msg = `✓ Asiento #${asientoTraslado} guardado (${guardadas} traslados)`;
+  let msg = `✓ Asiento #${asientoTraslado} guardado (${guardadas} traslados)`;
+  if(errores.length){
+    msg += ` — ⚠️ ${errores.length} CP ya registrada en cosecha: ${errores.join(', ')}`;
+    showToast('⚠️ CP duplicada con cosecha: '+errores.join(', '), 5000);
+  } else {
+    showToast(msg);
+  }
   est.textContent = msg+' — '+new Date().toLocaleTimeString('es-AR');
   actualizarBadgeAsientoTraslado();
   showToast(msg);
