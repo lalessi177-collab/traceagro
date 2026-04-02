@@ -486,13 +486,7 @@ function renderCosecha(){
           <option value="mov" ${f.destino==='mov'?'selected':''}>↔ Mov. interno</option>
         </select>
       </td>
-      <td id="cp-td-${i}">
-        ${f.destino==='silo' ? `<select onchange="seleccionarSilo(${i}, this.value)" style="width:140px">${generarOpcionesSilos(i)}</select>` : `
-          <input value="${f.cpSilo||''}" placeholder="${f.destino==='cam'?'N° CP':'Destino'}" onchange="updF(${i},'cpSilo',this.value)" style="width:110px"/>
-          ${f.destino==='cam'?'<label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF"><input type="file" accept=".pdf" style="display:none" onchange="subirPDFCosecha(this,'+i+')"/>PDF</label>':''}
-          ${pdfData[i]?'<span style="color:#3B6D11;font-size:11px"> ✓</span>':''}
-        `}
-      </td>
+      <td id="cp-td-${i}">${renderCpSiloCell(f,i)}</td>
       <td><input value="${f.chofer||''}" onchange="updF(${i},'chofer',this.value)" list="dl-chofer" style="width:105px"/></td>
       <td><input value="${f.embolso||''}" onchange="updF(${i},'embolso',this.value)" list="dl-embolso" style="width:75px"/></td>
       <td><input value="${f.contratista||''}" onchange="updF(${i},'contratista',this.value)" list="dl-contratista" style="width:105px"/></td>
@@ -524,6 +518,19 @@ function actualizarDataLists(){
     const uniq = [...new Set(vals.filter(v=>v))];
     dl.innerHTML = uniq.map(v=>`<option value="${v}">`).join('');
   });
+}
+
+function renderCpSiloCell(f, i){
+  if(f.destino==='silo'){
+    return '<select onchange="seleccionarSilo('+i+', this.value)" style="width:140px">'+generarOpcionesSilos(i)+'</select>';
+  }
+  let html = '<input value="'+(f.cpSilo||'')+'" placeholder="'+(f.destino==='cam'?'N° CP':'Destino')+'" onchange="updF('+i+',\'cpSilo\',this.value)" style="width:110px"/>';
+  if(f.destino==='cam'){
+    html += '<label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF">';
+    html += '<input type="file" accept=".pdf" style="display:none" onchange="subirPDFCosecha(this,'+i+')"/>PDF</label>';
+  }
+  if(pdfData[i]) html += '<span style="color:#3B6D11;font-size:11px"> ✓</span>';
+  return html;
 }
 
 function generarOpcionesSilos(rowIdx){
