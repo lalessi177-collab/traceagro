@@ -513,6 +513,10 @@ function updF(i,campo,val){
 }
 
 function remF(i){
+  const f = filasCosecha[i];
+  if(f.savedToSheets){
+    if(!confirm('Esta fila ya fue guardada en Sheets. Si la borrás acá, en Sheets sigue existiendo. ¿Querés borrarla igual de la pantalla?')) return;
+  }
   filasCosecha.splice(i,1);
   renderCosecha();
 }
@@ -605,6 +609,7 @@ async function guardarCosecha(){
   guardarLocal();
   const est = document.getElementById('estado-cosecha');
   est.textContent = 'Guardando...';
+  let guardadas=0, saltadas=0;
 
   for(let i=0;i<filasCosecha.length;i++){
     const f = filasCosecha[i];
@@ -621,12 +626,21 @@ async function guardarCosecha(){
       contratista: f.contratista||''
     });
     try{
+      const resp = await fetch(SHEETS_URL+'?'+params.toString());
+      const data = await resp.json();
+      if(data.skipped) saltadas++;
+      else { guardadas++; filasCosecha[i].savedToSheets = true; }
+      await new Promise(r=>setTimeout(r,500));
+    }catch(e){
+      // fallback sin-cors si falla el fetch con respuesta
       await fetch(SHEETS_URL+'?'+params.toString(),{method:'GET',mode:'no-cors'});
       await new Promise(r=>setTimeout(r,800));
-    }catch(e){ console.warn(e); }
+    }
   }
-  est.textContent = '✓ Guardado '+new Date().toLocaleTimeString('es-AR');
-  showToast('✓ Datos guardados en Google Sheets');
+  guardarLocal();
+  const msg = saltadas>0 ? `✓ ${guardadas} nuevas, ${saltadas} ya existían` : `✓ ${guardadas} filas guardadas`;
+  est.textContent = msg+' — '+new Date().toLocaleTimeString('es-AR');
+  showToast(msg);
 }
 
 async function cargarCosechaDeSheets(){
