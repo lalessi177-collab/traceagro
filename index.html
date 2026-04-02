@@ -349,6 +349,7 @@ let usuario = null;
 let filasCosecha = [];
 let filasTraslado = [];
 let silosStock = {};
+let silosHistoricos = []; // silos usados en jornadas anteriores
 
 // ── UTILS ──
 function fmt(n){ return Math.round(n).toLocaleString('es-AR'); }
@@ -491,6 +492,8 @@ function renderCosecha(){
 }
 
 function actualizarDataLists(){
+  const silosLocales = filasCosecha.filter(f=>f.destino==='silo').map(f=>f.cpSilo);
+  const todosSilos = [...new Set([...silosHistoricos, ...silosLocales].filter(v=>v))];
   const campos = {
     'dl-lotes':     filasCosecha.map(f=>f.lote),
     'dl-variedad':  filasCosecha.map(f=>f.variedad),
@@ -498,7 +501,7 @@ function actualizarDataLists(){
     'dl-contratista': filasCosecha.map(f=>f.contratista),
     'dl-chofer':    filasCosecha.map(f=>f.chofer),
     'dl-embolso':   filasCosecha.map(f=>f.embolso),
-    'dl-silo':      filasCosecha.filter(f=>f.destino==='silo').map(f=>f.cpSilo)
+    'dl-silo':      todosSilos
   };
   Object.entries(campos).forEach(([id, vals])=>{
     const dl = document.getElementById(id);
@@ -667,6 +670,12 @@ async function cargarCosechaDeSheets(){
     const resp = await fetch(SHEETS_URL+'?'+params.toString());
     const data = await resp.json();
     if(data.ok && data.filas && data.filas.length){
+      // Extraer silos históricos para el autocomplete
+      silosHistoricos = [...new Set(
+        data.filas
+          .filter(f=>f['Destino tipo']==='silo' && f['CP / Silo / Destino'])
+          .map(f=>String(f['CP / Silo / Destino']).trim())
+      )];
       filasCosecha = data.filas.map((f,i)=>({
         id: Date.now()+i,
         fecha: f['Fecha']||'', lote: f['Lote']||'', has: f['Has']||'',
@@ -881,8 +890,12 @@ async function exportarExcelTraslado(){
   historial.forEach(f=>{
     const kg = parseFloat(f['Kg'])||0;
     total += kg;
+    // Limpiar fecha — puede venir como Date object o string con timestamp
+    let fecha = f['Fecha']||'';
+    if(fecha instanceof Date) fecha = fecha.toLocaleDateString('es-AR');
+    else if(String(fecha).includes('T')) fecha = String(fecha).split('T')[0];
     rows.push([
-      f['Fecha']||'', f['Técnico']||'', f['Silo de origen']||'',
+      fecha, f['Técnico']||'', f['Silo de origen']||'',
       kg, f['Carta de Porte']||'', f['Destino']||'',
       f['Chofer']||'', f['Contrato']||f['Patente']||'', f['Transportista']||''
     ]);
