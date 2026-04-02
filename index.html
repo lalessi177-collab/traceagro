@@ -530,10 +530,8 @@ function calcKgS(i){
 
 function actualizarTotalesCosecha(){
   let totHas=0, totKgH=0, totKgS=0, totCam=0;
-  const loteHas = {};
   filasCosecha.forEach(f=>{
-    const has = parseFloat(f.has)||0;
-    if(has && !loteHas[f.lote]){ loteHas[f.lote]=has; totHas+=has; }
+    totHas += parseFloat(f.has)||0;
     totKgH += parseFloat(f.kgH)||0;
     totKgS += parseFloat(f.kgS)||0;
     if(f.destino==='cam') totCam++;
@@ -1068,9 +1066,9 @@ function generarWorkbookCosecha(campo, cultivo, camp) {
   const loteMap = {};
   filasCosecha.forEach(f => {
     if(!f.lote) return;
-    if(!loteMap[f.lote]) loteMap[f.lote] = {has:0,hasSet:false,kgH:0,kgS:0,cam:0,silo:0,mov:0};
+    if(!loteMap[f.lote]) loteMap[f.lote] = {has:0,kgH:0,kgS:0,cam:0,silo:0,mov:0};
     const l = loteMap[f.lote];
-    if(parseFloat(f.has)&&!l.hasSet){l.has=parseFloat(f.has);l.hasSet=true;}
+    if(parseFloat(f.has)) l.has += parseFloat(f.has);
     l.kgH+=parseFloat(f.kgH)||0; l.kgS+=parseFloat(f.kgS)||0;
     if(f.destino==='cam') l.cam+=parseFloat(f.kgH)||0;
     if(f.destino==='silo') l.silo+=parseFloat(f.kgH)||0;
