@@ -535,7 +535,7 @@ function nuevaJornada(){
   showToast('🌅 Nueva jornada iniciada');
 }
 
-
+function calcKgS(i){
   const f = filasCosecha[i];
   const cultivo = document.getElementById('c-cultivo').value;
   f.kgS = calcKgSecos(parseFloat(f.kgH)||0, parseFloat(f.hum)||0, cultivo);
