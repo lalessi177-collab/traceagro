@@ -210,6 +210,10 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
           <label>Fecha</label>
           <input type="text" id="c-fecha" style="width:110px"/>
         </div>
+        <div class="field">
+          <label>Asiento</label>
+          <div id="asiento-badge" style="font-size:13px;font-weight:700;color:#888;padding:5px 8px;border:1px solid #ddd;border-radius:6px;min-width:60px;text-align:center">—</div>
+        </div>
         <button class="btn btn-gray btn-sm" onclick="volverMenu()">← Menú</button>
       </div>
 
@@ -289,6 +293,10 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
           <label>Fecha</label>
           <input type="text" id="t-fecha" style="width:110px"/>
         </div>
+        <div class="field">
+          <label>Asiento</label>
+          <div id="t-asiento-badge" style="font-size:13px;font-weight:700;color:#888;padding:5px 8px;border:1px solid #ddd;border-radius:6px;min-width:60px;text-align:center">—</div>
+        </div>
         <button class="btn btn-blue btn-sm" onclick="cargarStockSilos()">🔄 Cargar silos</button>
         <button class="btn btn-gray btn-sm" onclick="volverMenu()">← Menú</button>
       </div>
@@ -354,6 +362,7 @@ let filasTraslado = [];
 let silosStock = {};
 let silosHistoricos = [];
 let asientoActual = null; // número de asiento de la jornada actual
+let asientoTraslado = null; // número de asiento de traslados
 
 // ── UTILS ──
 function fmt(n){ return Math.round(n).toLocaleString('es-AR'); }
@@ -439,6 +448,34 @@ function abrirModulo(mod){
 }
 
 // ── COSECHA ──
+function actualizarBadgeAsientoTraslado(){
+  const badge = document.getElementById('t-asiento-badge');
+  if(!badge) return;
+  if(asientoTraslado){
+    badge.textContent = '#'+asientoTraslado;
+    badge.style.color = '#534AB7';
+    badge.style.borderColor = '#534AB7';
+  } else {
+    badge.textContent = '—';
+    badge.style.color = '#888';
+    badge.style.borderColor = '#ddd';
+  }
+}
+
+function actualizarBadgeAsiento(){
+  const badge = document.getElementById('asiento-badge');
+  if(!badge) return;
+  if(asientoActual){
+    badge.textContent = '#'+asientoActual;
+    badge.style.color = '#3B6D11';
+    badge.style.borderColor = '#3B6D11';
+  } else {
+    badge.textContent = '—';
+    badge.style.color = '#888';
+    badge.style.borderColor = '#ddd';
+  }
+}
+
 function cambiarJornada(){
   filasCosecha = [];
   asientoActual = null;
@@ -585,6 +622,7 @@ function nuevaJornada(){
   filasCosecha = [];
   asientoActual = null;
   agregarFilaCosecha();
+  actualizarBadgeAsiento();
   document.getElementById('estado-cosecha').textContent = '';
   showToast('🌅 Nueva jornada iniciada');
 }
@@ -726,6 +764,7 @@ async function guardarCosecha(){
   guardarLocal();
   const msg = `✓ Asiento #${asientoActual} guardado (${guardadas} filas)`;
   est.textContent = msg + ' — ' + new Date().toLocaleTimeString('es-AR');
+  actualizarBadgeAsiento();
   showToast(msg);
 }
 
@@ -818,11 +857,14 @@ async function cargarStockSilos(){
       }).join('');
     }
     filasTraslado = [];
+    asientoTraslado = null;
     agregarFilaTraslado();
     renderTraslado();
+    actualizarBadgeAsientoTraslado();
   }catch(e){
     grid.innerHTML='<div style="font-size:12px;color:#888">Sin conexión a Sheets.</div>';
     filasTraslado = [];
+    asientoTraslado = null;
     agregarFilaTraslado();
     renderTraslado();
   }
@@ -898,24 +940,51 @@ async function guardarTraslado(){
   const cultivo=document.getElementById('t-cultivo').value;
   const camp=document.getElementById('t-campania').value;
   const est=document.getElementById('estado-traslado');
-  est.textContent='Guardando...';
+
+  // Sistema de asientos
+  if(asientoTraslado){
+    if(!confirm(`Estos traslados ya fueron guardados como Asiento #${asientoTraslado}.\n¿Querés regrabarlos?`)) return;
+    est.textContent = `Regrabando Asiento #${asientoTraslado}...`;
+    try{
+      const delParams = new URLSearchParams({action:'update_traslado',campo,cultivo,campania:camp,asiento:asientoTraslado});
+      await fetch(SHEETS_URL+'?'+delParams.toString());
+      await new Promise(r=>setTimeout(r,1000));
+    }catch(e){ console.warn(e); }
+  } else {
+    est.textContent = 'Preparando asiento...';
+    try{
+      const asParams = new URLSearchParams({action:'next_asiento_traslado',campo,cultivo,campania:camp});
+      const asResp = await fetch(SHEETS_URL+'?'+asParams.toString());
+      const asData = await asResp.json();
+      asientoTraslado = asData.next || '001';
+    }catch(e){
+      asientoTraslado = String(Date.now()).slice(-3);
+    }
+    est.textContent = `Guardando Asiento #${asientoTraslado}...`;
+  }
+
+  let guardadas = 0;
   for(let i=0;i<filasTraslado.length;i++){
     const f=filasTraslado[i];
     if(!f.kg||!f.silo) continue;
     const params=new URLSearchParams({
       action:'write_traslado_silo',
       campo,cultivo,campania:camp,tecnico:usuario,
+      asiento:asientoTraslado,
       fecha:f.fecha||'',silo:f.silo||'',kg:f.kg||0,
       cp:f.cp||'',destino:f.destino||'',
       chofer:f.chofer||'',contrato:f.contrato||'',transporte:f.transporte||''
     });
     try{
-      await fetch(SHEETS_URL+'?'+params.toString(),{method:'GET',mode:'no-cors'});
-      await new Promise(r=>setTimeout(r,800));
+      await fetch(SHEETS_URL+'?'+params.toString());
+      guardadas++;
+      await new Promise(r=>setTimeout(r,500));
     }catch(e){ console.warn(e); }
   }
-  est.textContent='✓ Guardado '+new Date().toLocaleTimeString('es-AR');
-  showToast('✓ Traslados guardados en Google Sheets');
+  const msg = `✓ Asiento #${asientoTraslado} guardado (${guardadas} traslados)`;
+  est.textContent = msg+' — '+new Date().toLocaleTimeString('es-AR');
+  actualizarBadgeAsientoTraslado();
+  showToast(msg);
   cargarStockSilos();
 }
 
