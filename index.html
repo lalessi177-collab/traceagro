@@ -356,6 +356,16 @@ let silosHistoricos = []; // silos usados en jornadas anteriores
 
 // ── UTILS ──
 function fmt(n){ return Math.round(n).toLocaleString('es-AR'); }
+function formatFecha(f){
+  if(!f) return '';
+  if(f instanceof Date){
+    return String(f.getDate()).padStart(2,'0')+'/'+String(f.getMonth()+1).padStart(2,'0')+'/'+f.getFullYear();
+  }
+  const s = String(f);
+  if(s.includes('T')) return s.split('T')[0].split('-').reverse().join('/');
+  if(s.includes('-') && s.length>=10) return s.substring(0,10).split('-').reverse().join('/');
+  return s;
+}
 function hoy(){ const d=new Date(); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
 function showToast(msg, dur=2500){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),dur); }
 function calcKgSecos(kgH, hum, cultivo){
@@ -477,9 +487,11 @@ function renderCosecha(){
         </select>
       </td>
       <td id="cp-td-${i}">
-        <input value="${f.cpSilo||''}" placeholder="${f.destino==='cam'?'N° CP':f.destino==='silo'?'Nombre silo':'Destino'}" onchange="updF(${i},'cpSilo',this.value)" style="width:${f.destino==='cam'?'110':'140'}px"/>
-        ${f.destino==='cam'?'<label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF"><input type="file" accept=".pdf" style="display:none" onchange="subirPDFCosecha(this,'+i+')"/>PDF</label>':''}
-        ${pdfData[i]?'<span style="color:#3B6D11;font-size:11px"> ✓</span>':''}
+        ${f.destino==='silo' ? `<select onchange="seleccionarSilo(${i}, this.value)" style="width:140px">${generarOpcionesSilos(i)}</select>` : `
+          <input value="${f.cpSilo||''}" placeholder="${f.destino==='cam'?'N° CP':'Destino'}" onchange="updF(${i},'cpSilo',this.value)" style="width:110px"/>
+          ${f.destino==='cam'?'<label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF"><input type="file" accept=".pdf" style="display:none" onchange="subirPDFCosecha(this,'+i+')"/>PDF</label>':''}
+          ${pdfData[i]?'<span style="color:#3B6D11;font-size:11px"> ✓</span>':''}
+        `}
       </td>
       <td><input value="${f.chofer||''}" onchange="updF(${i},'chofer',this.value)" list="dl-chofer" style="width:105px"/></td>
       <td><input value="${f.embolso||''}" onchange="updF(${i},'embolso',this.value)" list="dl-embolso" style="width:75px"/></td>
@@ -514,7 +526,33 @@ function actualizarDataLists(){
   });
 }
 
-function updF(i,campo,val){
+function generarOpcionesSilos(rowIdx){
+  const f = filasCosecha[rowIdx];
+  const silosLocales = filasCosecha.filter(x=>x.destino==='silo'&&x.cpSilo).map(x=>x.cpSilo);
+  const todos = [...new Set([...silosHistoricos, ...silosLocales])];
+  let html = '<option value="">— Elegir silo —</option>';
+  todos.forEach(s=>{
+    html += '<option value="'+s+'"'+(f&&f.cpSilo===s?' selected':'')+'>'+s+'</option>';
+  });
+  html += '<option value="__nuevo__">+ Nuevo silo...</option>';
+  return html;
+}
+
+function seleccionarSilo(i, val){
+  if(val === '__nuevo__'){
+    const nombre = prompt('Nombre del nuevo silo bolsa:');
+    if(!nombre || !nombre.trim()){ renderCosecha(); return; }
+    filasCosecha[i].cpSilo = nombre.trim();
+    // Agregar a silosHistoricos para que aparezca en otras filas
+    if(!silosHistoricos.includes(nombre.trim())) silosHistoricos.push(nombre.trim());
+  } else {
+    filasCosecha[i].cpSilo = val;
+  }
+  guardarLocal();
+  renderCosecha();
+}
+
+
   filasCosecha[i][campo] = val;
   guardarLocal();
 }
@@ -916,12 +954,8 @@ async function exportarExcelTraslado(){
   historial.forEach(f=>{
     const kg = parseFloat(f['Kg'])||0;
     total += kg;
-    // Limpiar fecha — puede venir como Date object o string con timestamp
-    let fecha = f['Fecha']||'';
-    if(fecha instanceof Date) fecha = fecha.toLocaleDateString('es-AR');
-    else if(String(fecha).includes('T')) fecha = String(fecha).split('T')[0];
     rows.push([
-      fecha, f['Técnico']||'', f['Silo de origen']||'',
+      formatFecha(f['Fecha']), f['Técnico']||'', f['Silo de origen']||'',
       kg, f['Carta de Porte']||'', f['Destino']||'',
       f['Chofer']||'', f['Contrato']||f['Patente']||'', f['Transportista']||''
     ]);
@@ -1142,10 +1176,8 @@ function generarWorkbookCosecha(campo, cultivo, camp, filasParam) {
   rows.push(['Fecha','Lote','Has','Variedad','Contrato','Kg Húmedos','Humedad %','Kg Secos','Tipo','CP / Silo / Destino','CTG','Destinatario','Destino','Chofer','Transportista','Kg Bruto','Kg Neto','Kms','Tarifa','Embolso','Contratista','Técnico']);
   filas.forEach(f => {
     const tipo = f.destino==='cam'?'Camión':f.destino==='silo'?'Silo bolsa':'Mov. interno';
-    let fecha = f.fecha||'';
-    if(fecha instanceof Date) fecha = fecha.toLocaleDateString('es-AR');
-    else if(String(fecha).includes('T')) fecha = String(fecha).split('T')[0];
-    rows.push([fecha,f.lote,f.has||'',f.variedad,f.contrato,
+    
+    rows.push([formatFecha(f.fecha),f.lote,f.has||'',f.variedad,f.contrato,
       parseFloat(f.kgH)||0,parseFloat(f.hum)||'',parseFloat(f.kgS)||0,
       tipo,f.cpSilo,f.ctg||'',f.destinatario||'',f.destino2||f.cpSilo||'',
       f.chofer,f.transporte||'',f.kgBruto||'',parseFloat(f.kgH)||0,
