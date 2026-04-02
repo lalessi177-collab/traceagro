@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>TraceAgro Sync</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>TraceAgro Sync v2.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#f4f6f4;color:#222;min-height:100vh}
@@ -849,14 +852,37 @@ async function guardarTraslado(){
 }
 
 // ── EXCEL COSECHA ──
-function exportarExcelCosecha(){
+async function exportarExcelCosecha(){
   const campo=document.getElementById('c-campo').value;
   const cultivo=document.getElementById('c-cultivo').value;
   const camp=document.getElementById('c-campania').value;
-  const wb=generarWorkbookCosecha(campo,cultivo,camp);
+  showToast('Descargando historial desde Sheets...', 4000);
+
+  // Traer historial completo desde Sheets
+  let filasHistorial = filasCosecha; // fallback a datos locales
+  try{
+    const params = new URLSearchParams({action:'read_cosecha',campo,cultivo,campania:camp});
+    const resp = await fetch(SHEETS_URL+'?'+params.toString());
+    const data = await resp.json();
+    if(data.ok && data.filas && data.filas.length){
+      filasHistorial = data.filas.map((f,i)=>({
+        id: i,
+        fecha: f['Fecha']||'', lote: f['Lote']||'', has: f['Has']||'',
+        variedad: f['Variedad']||'', contrato: f['Contrato']||'',
+        kgH: f['Kg Húmedos']||'', hum: f['Humedad %']||'', kgS: f['Kg Secos']||'',
+        destino: f['Destino tipo']||'cam', cpSilo: f['CP / Silo / Destino']||'',
+        chofer: f['Chofer']||'', embolso: f['Embolso']||'',
+        contratista: f['Contratista']||'', tecnico: f['Técnico']||usuario
+      }));
+    }
+  }catch(e){
+    console.warn('Sin conexión, usando datos locales');
+  }
+
+  const wb = generarWorkbookCosecha(campo, cultivo, camp, filasHistorial);
   const fname=`Cosecha_${campo}_${cultivo}_${camp.replace('/','_')}_${hoy().replace(/\//g,'-')}.xlsx`;
   XLSX.writeFile(wb,fname);
-  showToast('✓ Excel descargado');
+  showToast('✓ Excel descargado con '+filasHistorial.length+' registros');
 }
 async function exportarExcelTraslado(){
   const campo=document.getElementById('t-campo').value;
@@ -1083,7 +1109,8 @@ async function exportarZipCosecha() {
   showToast('✓ ZIP descargado con Excel y ' + Object.keys(pdfData).length + ' CPs');
 }
 
-function generarWorkbookCosecha(campo, cultivo, camp) {
+function generarWorkbookCosecha(campo, cultivo, camp, filasParam) {
+  const filas = filasParam || filasCosecha;
   const wb = XLSX.utils.book_new();
   const rows = [];
   rows.push([`${cultivo.toUpperCase()} — ${campo.toUpperCase()} — Campaña ${camp}`]);
@@ -1091,7 +1118,7 @@ function generarWorkbookCosecha(campo, cultivo, camp) {
   rows.push([]);
   
   const loteMap = {};
-  filasCosecha.forEach(f => {
+  filas.forEach(f => {
     if(!f.lote) return;
     if(!loteMap[f.lote]) loteMap[f.lote] = {has:0,kgH:0,kgS:0,cam:0,silo:0,mov:0};
     const l = loteMap[f.lote];
@@ -1113,20 +1140,23 @@ function generarWorkbookCosecha(campo, cultivo, camp) {
   
   rows.push(['DETALLE COMPLETO DE MOVIMIENTOS']);
   rows.push(['Fecha','Lote','Has','Variedad','Contrato','Kg Húmedos','Humedad %','Kg Secos','Tipo','CP / Silo / Destino','CTG','Destinatario','Destino','Chofer','Transportista','Kg Bruto','Kg Neto','Kms','Tarifa','Embolso','Contratista','Técnico']);
-  filasCosecha.forEach(f => {
+  filas.forEach(f => {
     const tipo = f.destino==='cam'?'Camión':f.destino==='silo'?'Silo bolsa':'Mov. interno';
-    rows.push([f.fecha,f.lote,f.has||'',f.variedad,f.contrato,
+    let fecha = f.fecha||'';
+    if(fecha instanceof Date) fecha = fecha.toLocaleDateString('es-AR');
+    else if(String(fecha).includes('T')) fecha = String(fecha).split('T')[0];
+    rows.push([fecha,f.lote,f.has||'',f.variedad,f.contrato,
       parseFloat(f.kgH)||0,parseFloat(f.hum)||'',parseFloat(f.kgS)||0,
       tipo,f.cpSilo,f.ctg||'',f.destinatario||'',f.destino2||f.cpSilo||'',
       f.chofer,f.transporte||'',f.kgBruto||'',parseFloat(f.kgH)||0,
-      f.kms||'',f.tarifa||'',f.embolso,f.contratista,usuario]);
+      f.kms||'',f.tarifa||'',f.embolso,f.contratista,f.tecnico||usuario]);
   });
   rows.push([]);
   
   rows.push(['CUENTA CORRIENTE SILO BOLSA']);
   rows.push(['Silo','Kg Entrada','Kg Salida','Saldo disponible']);
   const entradas={}, salidas={};
-  filasCosecha.forEach(f=>{ if(f.destino==='silo'&&f.cpSilo){if(!entradas[f.cpSilo])entradas[f.cpSilo]=0;entradas[f.cpSilo]+=parseFloat(f.kgH)||0;} });
+  filas.forEach(f=>{ if(f.destino==='silo'&&f.cpSilo){if(!entradas[f.cpSilo])entradas[f.cpSilo]=0;entradas[f.cpSilo]+=parseFloat(f.kgH)||0;} });
   filasTraslado.forEach(f=>{ if(f.silo){if(!salidas[f.silo])salidas[f.silo]=0;salidas[f.silo]+=parseFloat(f.kg)||0;} });
   Object.entries(entradas).forEach(([n,e])=>{ rows.push([n,e,salidas[n]||0,e-(salidas[n]||0)]); });
   
