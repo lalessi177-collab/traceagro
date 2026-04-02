@@ -352,7 +352,8 @@ let usuario = null;
 let filasCosecha = [];
 let filasTraslado = [];
 let silosStock = {};
-let silosHistoricos = []; // silos usados en jornadas anteriores
+let silosHistoricos = [];
+let asientoActual = null; // número de asiento de la jornada actual
 
 // ── UTILS ──
 function fmt(n){ return Math.round(n).toLocaleString('es-AR'); }
@@ -439,8 +440,8 @@ function abrirModulo(mod){
 
 // ── COSECHA ──
 function cambiarJornada(){
-  // Limpiar filas y cargar datos del nuevo campo/cultivo/campaña
   filasCosecha = [];
+  asientoActual = null;
   cargarCosechaDeSheets();
 }
 
@@ -582,6 +583,7 @@ function nuevaJornada(){
   const key = `ta_cosecha_${campo}_${cultivo}_${camp}`;
   localStorage.removeItem(key);
   filasCosecha = [];
+  asientoActual = null;
   agregarFilaCosecha();
   document.getElementById('estado-cosecha').textContent = '';
   showToast('🌅 Nueva jornada iniciada');
@@ -672,16 +674,40 @@ async function guardarCosecha(){
   const camp = document.getElementById('c-campania').value;
   guardarLocal();
   const est = document.getElementById('estado-cosecha');
-  est.textContent = 'Guardando...';
-  let guardadas=0, saltadas=0;
 
+  // Si ya tiene asiento, preguntar si quiere regrabar
+  if(asientoActual){
+    if(!confirm(`Estas filas ya fueron guardadas como Asiento #${asientoActual}.\n¿Querés regrabarlas? (reemplaza lo anterior en Sheets)`)) return;
+    est.textContent = `Regrabando Asiento #${asientoActual}...`;
+    // Borrar filas del asiento en Sheets
+    try{
+      const delParams = new URLSearchParams({action:'update_cosecha',campo,cultivo,campania:camp,asiento:asientoActual});
+      await fetch(SHEETS_URL+'?'+delParams.toString());
+      await new Promise(r=>setTimeout(r,1000));
+    }catch(e){ console.warn(e); }
+  } else {
+    // Obtener próximo número de asiento
+    est.textContent = 'Preparando asiento...';
+    try{
+      const asParams = new URLSearchParams({action:'next_asiento',campo,cultivo,campania:camp});
+      const asResp = await fetch(SHEETS_URL+'?'+asParams.toString());
+      const asData = await asResp.json();
+      asientoActual = asData.next || '001';
+    }catch(e){
+      // Generar localmente si falla
+      asientoActual = String(Date.now()).slice(-3);
+    }
+    est.textContent = `Guardando Asiento #${asientoActual}...`;
+  }
+
+  let guardadas = 0;
   for(let i=0;i<filasCosecha.length;i++){
     const f = filasCosecha[i];
     if(!f.kgH) continue;
     const params = new URLSearchParams({
       action:'write_cosecha',
       campo, cultivo, campania:camp,
-      tecnico: usuario,
+      tecnico: usuario, asiento: asientoActual,
       fecha: f.fecha||'', lote: f.lote||'', has: f.has||'',
       variedad: f.variedad||'', contrato: f.contrato||'',
       kgH: f.kgH||0, hum: f.hum||'', kgS: f.kgS||0,
@@ -690,20 +716,16 @@ async function guardarCosecha(){
       contratista: f.contratista||''
     });
     try{
-      const resp = await fetch(SHEETS_URL+'?'+params.toString());
-      const data = await resp.json();
-      if(data.skipped) saltadas++;
-      else { guardadas++; filasCosecha[i].savedToSheets = true; }
+      await fetch(SHEETS_URL+'?'+params.toString());
+      guardadas++;
       await new Promise(r=>setTimeout(r,500));
-    }catch(e){
-      // fallback sin-cors si falla el fetch con respuesta
-      await fetch(SHEETS_URL+'?'+params.toString(),{method:'GET',mode:'no-cors'});
-      await new Promise(r=>setTimeout(r,800));
-    }
+    }catch(e){ console.warn(e); }
   }
+  // Marcar todas como guardadas
+  filasCosecha.forEach(f=>{ if(f.kgH) f.savedToSheets = true; });
   guardarLocal();
-  const msg = saltadas>0 ? `✓ ${guardadas} nuevas, ${saltadas} ya existían` : `✓ ${guardadas} filas guardadas`;
-  est.textContent = msg+' — '+new Date().toLocaleTimeString('es-AR');
+  const msg = `✓ Asiento #${asientoActual} guardado (${guardadas} filas)`;
+  est.textContent = msg + ' — ' + new Date().toLocaleTimeString('es-AR');
   showToast(msg);
 }
 
