@@ -7,6 +7,12 @@
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
 <title>TraceAgro Sync v2.1</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#3B6D11"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TraceAgro Sync"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#f4f6f4;color:#222;min-height:100vh}
@@ -1353,6 +1359,29 @@ function generarWorkbookCosecha(campo, cultivo, camp, filasParam) {
   return wb;
 }
 
+</script>
+<!-- PWA: Service Worker + Update Banner -->
+<div id="sw-update-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#3B6D11;color:#fff;padding:12px 20px;text-align:center;z-index:9999;font-size:14px;">
+  🌿 Nueva versión disponible — <button onclick="location.reload()" style="background:#fff;color:#3B6D11;border:none;padding:4px 14px;border-radius:6px;font-weight:700;cursor:pointer;margin-left:8px;">Actualizar</button>
+</div>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      newSW.addEventListener('statechange', () => {
+        if (newSW.state === 'activated') {
+          document.getElementById('sw-update-banner').style.display = 'block';
+        }
+      });
+    });
+  });
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'SW_UPDATED') {
+      document.getElementById('sw-update-banner').style.display = 'block';
+    }
+  });
+}
 </script>
 </body>
 </html>
