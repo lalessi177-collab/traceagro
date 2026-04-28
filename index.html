@@ -204,7 +204,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
         </div>
         <div class="field">
           <label>Campaña</label>
-          <select id="c-campania" onchange="cambiarJornada()"><option>25/26</option><option>26/27</option></select>
+          <select id="c-campania" onchange="cambiarJornada()"><option>24/25</option><option>25/26</option><option>26/27</option></select>
         </div>
         <div class="field">
           <label>Fecha</label>
@@ -287,7 +287,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
         </div>
         <div class="field">
           <label>Campaña</label>
-          <select id="t-campania"><option>25/26</option><option>26/27</option></select>
+          <select id="t-campania"><option>24/25</option><option>25/26</option><option>26/27</option></select>
         </div>
         <div class="field">
           <label>Fecha</label>
@@ -352,7 +352,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 // ── CONFIG ──
 const PASS = 'estanar2526';
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbw4gIZ573OLM_yJKNL2exiRKp5nYK1MIELUQsDKUqoXkiDKB-2lZUg7V0E5Lr_XByNZeg/exec';
-const CAMPOS = ['Algimar','La Mañana','La Querencia','San Lorenzo'];
+const ZONAS = {
+  'Oeste':    ['La Liliana','La Cecilia','La Payanca'],
+  'Sudeste':  ['Namuncura','San Eustaquio','Algimar','La Querencia','Las Hayas del Moro','La Reforma'],
+  'Sudoeste': ['San Lorenzo','La Mañana'],
+  'Centro':   ['La Celina','Santa Adela','San Jose','Los Tojos','Tres Marias','San Benito']
+};
+const CAMPOS = Object.values(ZONAS).flat();
 const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15:1.73,15.5:2.31,16:2.89,16.5:3.47,17:4.05,17.5:4.62,18:5.2,18.5:5.78,19:6.36,19.5:6.94,20:7.51};
 
 // ── STATE ──
@@ -414,7 +420,9 @@ function iniciarApp(){
   // Poblar campos
   ['c-campo','t-campo'].forEach(id=>{
     const sel = document.getElementById(id);
-    sel.innerHTML = CAMPOS.map(c=>`<option>${c}</option>`).join('');
+    sel.innerHTML = Object.entries(ZONAS).map(([zona, campos])=>
+      `<optgroup label="── ${zona} ──">${campos.map(c=>`<option>${c}</option>`).join('')}</optgroup>`
+    ).join('');
   });
   // Fecha hoy
   document.getElementById('c-fecha').value = hoy();
