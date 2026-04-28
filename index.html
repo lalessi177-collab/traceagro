@@ -192,8 +192,15 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <!-- Jornada -->
       <div class="jornada-bar">
         <div class="field">
+          <label>Zona</label>
+          <select id="c-zona" onchange="cambiarZona('c')">
+            <option value="">— Zona —</option>
+            <option>Oeste</option><option>Sudeste</option><option>Sudoeste</option><option>Centro</option>
+          </select>
+        </div>
+        <div class="field">
           <label>Establecimiento</label>
-          <select id="c-campo"></select>
+          <select id="c-campo" onchange="cambiarJornada()"></select>
         </div>
         <div class="field">
           <label>Cultivo</label>
@@ -274,6 +281,13 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
     <!-- MÓDULO TRASLADOS -->
     <div id="panel-traslado" class="hidden">
       <div class="jornada-bar">
+        <div class="field">
+          <label>Zona</label>
+          <select id="t-zona" onchange="cambiarZona('t')">
+            <option value="">— Zona —</option>
+            <option>Oeste</option><option>Sudeste</option><option>Sudoeste</option><option>Centro</option>
+          </select>
+        </div>
         <div class="field">
           <label>Establecimiento</label>
           <select id="t-campo"></select>
@@ -417,17 +431,27 @@ function iniciarApp(){
   document.getElementById('screen-login').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('hidden');
   document.getElementById('topbar-user').textContent = usuario;
-  // Poblar campos
+  // Inicializar selects de campo vacíos — se llenan al elegir zona
   ['c-campo','t-campo'].forEach(id=>{
     const sel = document.getElementById(id);
-    sel.innerHTML = Object.entries(ZONAS).map(([zona, campos])=>
-      `<optgroup label="── ${zona} ──">${campos.map(c=>`<option>${c}</option>`).join('')}</optgroup>`
-    ).join('');
+    if(sel) sel.innerHTML = '<option value="">— Elegir zona primero —</option>';
   });
   // Fecha hoy
   document.getElementById('c-fecha').value = hoy();
   document.getElementById('t-fecha').value = hoy();
   volverMenu();
+}
+
+function cambiarZona(prefix){
+  const zona = document.getElementById(prefix+'-zona').value;
+  const sel = document.getElementById(prefix+'-campo');
+  if(!zona){
+    sel.innerHTML = '<option value="">— Elegir zona primero —</option>';
+    return;
+  }
+  const campos = ZONAS[zona] || [];
+  sel.innerHTML = campos.map(c=>`<option>${c}</option>`).join('');
+  if(prefix==='c') cambiarJornada();
 }
 
 // Restaurar sesión
