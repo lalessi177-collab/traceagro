@@ -142,9 +142,37 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <label>Contraseña</label>
       <input type="password" id="login-pass" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
     </div>
-    <div id="login-err" class="err">Contraseña incorrecta</div>
+    <div id="login-err" class="err"></div>
     <br/>
     <button class="btn btn-green" onclick="doLogin()">Ingresar</button>
+    <p style="margin-top:18px;font-size:14px;color:#666;text-align:center;">
+      ¿Primera vez? <a href="#" onclick="showRegister();return false;" style="color:#3B6D11;font-weight:700;text-decoration:underline;">Registrate acá</a>
+    </p>
+  </div>
+</div>
+
+<!-- REGISTRO -->
+<div id="screen-register" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f6f4">
+  <div class="login-card">
+    <h2 style="color:#3B6D11;text-align:center;margin-bottom:24px;">Crear cuenta</h2>
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="reg-nombre" placeholder="Tu nombre"/>
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="reg-pass" placeholder="Mínimo 4 caracteres"/>
+    </div>
+    <div class="form-group">
+      <label>Repetir contraseña</label>
+      <input type="password" id="reg-pass2" placeholder="Repetí la contraseña" onkeydown="if(event.key==='Enter')doRegister()"/>
+    </div>
+    <div id="reg-err" class="err"></div>
+    <br/>
+    <button class="btn btn-green" onclick="doRegister()">Registrarme</button>
+    <p style="margin-top:18px;font-size:14px;color:#666;text-align:center;">
+      ¿Ya tenés cuenta? <a href="#" onclick="showLogin();return false;" style="color:#3B6D11;font-weight:700;text-decoration:underline;">Ingresá acá</a>
+    </p>
   </div>
 </div>
 
@@ -368,7 +396,6 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 // ── CONFIG ──
-const PASS = 'estanar2526';
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbw4gIZ573OLM_yJKNL2exiRKp5nYK1MIELUQsDKUqoXkiDKB-2lZUg7V0E5Lr_XByNZeg/exec';
 const ZONAS = {
   'Oeste':    ['La Liliana','La Cecilia','La Payanca'],
@@ -381,6 +408,7 @@ const MERMAS_TRIGO = {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.2
 
 // ── STATE ──
 let usuario = null;
+let userSSId = null; // ID del Google Sheet personal del usuario
 let filasCosecha = [];
 let filasTraslado = [];
 let silosStock = {};
@@ -411,28 +439,88 @@ function calcKgSecos(kgH, hum, cultivo){
 }
 
 // ── LOGIN ──
+// ── PANTALLAS LOGIN / REGISTRO ──
+function showRegister(){
+  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-register').classList.remove('hidden');
+}
+function showLogin(){
+  document.getElementById('screen-register').classList.add('hidden');
+  document.getElementById('screen-login').classList.remove('hidden');
+}
+
 function doLogin(){
   const nombre = document.getElementById('login-nombre').value.trim();
   const pass = document.getElementById('login-pass').value;
   if(!nombre){ showToast('Ingresá tu nombre'); return; }
-  if(pass !== PASS){
-    document.getElementById('login-err').style.display='block'; return;
-  }
-  document.getElementById('login-err').style.display='none';
-  usuario = nombre;
-  localStorage.setItem('ta_usuario', nombre);
-  iniciarApp();
+  if(!pass){ showToast('Ingresá tu contraseña'); return; }
+  const errEl = document.getElementById('login-err');
+  errEl.style.display='none';
+  showToast('Verificando...');
+  const url = SHEETS_URL + '?action=login&nombre='+encodeURIComponent(nombre)+'&pass='+encodeURIComponent(pass);
+  fetch(url).then(r=>r.json()).then(d=>{
+    if(!d.ok){
+      if(d.error==='USUARIO_NO_EXISTE') errEl.textContent='No existe ese usuario. ¿Querés registrarte?';
+      else if(d.error==='PASS_INCORRECTA') errEl.textContent='Contraseña incorrecta';
+      else errEl.textContent=d.error||'Error al ingresar';
+      errEl.style.display='block';
+      return;
+    }
+    usuario = d.nombre;
+    userSSId = d.ssId;
+    localStorage.setItem('ta_usuario', d.nombre);
+    localStorage.setItem('ta_ssId', d.ssId);
+    iniciarApp();
+  }).catch(err=>{
+    errEl.textContent='Error de conexión. Intentá de nuevo.';
+    errEl.style.display='block';
+  });
+}
+
+function doRegister(){
+  const nombre = document.getElementById('reg-nombre').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+  const errEl = document.getElementById('reg-err');
+  errEl.style.display='none';
+  if(!nombre){ errEl.textContent='Ingresá tu nombre'; errEl.style.display='block'; return; }
+  if(!pass || pass.length<4){ errEl.textContent='La contraseña debe tener al menos 4 caracteres'; errEl.style.display='block'; return; }
+  if(pass !== pass2){ errEl.textContent='Las contraseñas no coinciden'; errEl.style.display='block'; return; }
+  showToast('Creando cuenta...');
+  const url = SHEETS_URL + '?action=register&nombre='+encodeURIComponent(nombre)+'&pass='+encodeURIComponent(pass);
+  fetch(url).then(r=>r.json()).then(d=>{
+    if(!d.ok){
+      if(d.error==='USUARIO_EXISTE') errEl.textContent='Ese nombre ya está registrado. Probá otro o ingresá.';
+      else errEl.textContent=d.error||'Error al registrar';
+      errEl.style.display='block';
+      return;
+    }
+    showToast('¡Cuenta creada! Ingresando...');
+    usuario = d.nombre;
+    userSSId = d.ssId;
+    localStorage.setItem('ta_usuario', d.nombre);
+    localStorage.setItem('ta_ssId', d.ssId);
+    document.getElementById('screen-register').classList.add('hidden');
+    iniciarApp();
+  }).catch(err=>{
+    errEl.textContent='Error de conexión. Intentá de nuevo.';
+    errEl.style.display='block';
+  });
 }
 
 function doLogout(){
   usuario = null;
+  userSSId = null;
   localStorage.removeItem('ta_usuario');
+  localStorage.removeItem('ta_ssId');
   document.getElementById('screen-login').classList.remove('hidden');
+  document.getElementById('screen-register').classList.add('hidden');
   document.getElementById('screen-app').classList.add('hidden');
 }
 
 function iniciarApp(){
   document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-register').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('hidden');
   document.getElementById('topbar-user').textContent = usuario;
   // Inicializar selects de campo vacíos — se llenan al elegir zona
@@ -461,7 +549,8 @@ function cambiarZona(prefix){
 // Restaurar sesión
 window.onload = ()=>{
   const u = localStorage.getItem('ta_usuario');
-  if(u){ usuario=u; iniciarApp(); }
+  const s = localStorage.getItem('ta_ssId');
+  if(u && s){ usuario=u; userSSId=s; iniciarApp(); }
 };
 
 // ── MENÚ ──
@@ -755,7 +844,7 @@ async function guardarCosecha(){
     est.textContent = `Regrabando Asiento #${asientoActual}...`;
     // Borrar filas del asiento en Sheets
     try{
-      const delParams = new URLSearchParams({action:'update_cosecha',campo,cultivo,campania:camp,asiento:asientoActual});
+      const delParams = new URLSearchParams({ssId:userSSId,action:'update_cosecha',campo,cultivo,campania:camp,asiento:asientoActual});
       await fetch(SHEETS_URL+'?'+delParams.toString());
       await new Promise(r=>setTimeout(r,1000));
     }catch(e){ console.warn(e); }
@@ -763,7 +852,7 @@ async function guardarCosecha(){
     // Obtener próximo número de asiento
     est.textContent = 'Preparando asiento...';
     try{
-      const asParams = new URLSearchParams({action:'next_asiento',campo,cultivo,campania:camp});
+      const asParams = new URLSearchParams({ssId:userSSId,action:'next_asiento',campo,cultivo,campania:camp});
       const asResp = await fetch(SHEETS_URL+'?'+asParams.toString());
       const asData = await asResp.json();
       asientoActual = asData.next || '001';
@@ -824,7 +913,7 @@ async function cargarCosechaDeSheets(){
   cargarLocal();
   // Luego intentar Sheets
   try{
-    const params = new URLSearchParams({action:'read_cosecha',campo,cultivo,campania:camp});
+    const params = new URLSearchParams({ssId:userSSId,action:'read_cosecha',campo,cultivo,campania:camp});
     const resp = await fetch(SHEETS_URL+'?'+params.toString());
     const data = await resp.json();
     if(data.ok && data.filas && data.filas.length){
@@ -859,7 +948,7 @@ async function cargarStockSilos(){
   grid.innerHTML='<div style="font-size:12px;color:#888">Cargando stock desde Sheets...</div>';
   try{
     // 1) Leer entradas desde hoja de cosecha
-    const paramsCos = new URLSearchParams({action:'read_cosecha',campo,cultivo,campania:camp});
+    const paramsCos = new URLSearchParams({ssId:userSSId,action:'read_cosecha',campo,cultivo,campania:camp});
     const respCos = await fetch(SHEETS_URL+'?'+paramsCos.toString());
     const dataCos = await respCos.json();
     silosStock = {};
@@ -874,7 +963,7 @@ async function cargarStockSilos(){
     }
 
     // 2) Leer salidas desde hoja de traslados
-    const paramsTras = new URLSearchParams({action:'read_traslados',campo,cultivo,campania:camp});
+    const paramsTras = new URLSearchParams({ssId:userSSId,action:'read_traslados',campo,cultivo,campania:camp});
     const respTras = await fetch(SHEETS_URL+'?'+paramsTras.toString());
     const dataTras = await respTras.json();
     if(dataTras.ok && dataTras.filas){
@@ -994,14 +1083,14 @@ async function guardarTraslado(){
     if(!confirm(`Estos traslados ya fueron guardados como Asiento #${asientoTraslado}.\n¿Querés regrabarlos?`)) return;
     est.textContent = `Regrabando Asiento #${asientoTraslado}...`;
     try{
-      const delParams = new URLSearchParams({action:'update_traslado',campo,cultivo,campania:camp,asiento:asientoTraslado});
+      const delParams = new URLSearchParams({ssId:userSSId,action:'update_traslado',campo,cultivo,campania:camp,asiento:asientoTraslado});
       await fetch(SHEETS_URL+'?'+delParams.toString());
       await new Promise(r=>setTimeout(r,1000));
     }catch(e){ console.warn(e); }
   } else {
     est.textContent = 'Preparando asiento...';
     try{
-      const asParams = new URLSearchParams({action:'next_asiento_traslado',campo,cultivo,campania:camp});
+      const asParams = new URLSearchParams({ssId:userSSId,action:'next_asiento_traslado',campo,cultivo,campania:camp});
       const asResp = await fetch(SHEETS_URL+'?'+asParams.toString());
       const asData = await asResp.json();
       asientoTraslado = asData.next || '001';
@@ -1060,7 +1149,7 @@ async function exportarExcelCosecha(){
   // Traer historial completo desde Sheets
   let filasHistorial = filasCosecha; // fallback a datos locales
   try{
-    const params = new URLSearchParams({action:'read_cosecha',campo,cultivo,campania:camp});
+    const params = new URLSearchParams({ssId:userSSId,action:'read_cosecha',campo,cultivo,campania:camp});
     const resp = await fetch(SHEETS_URL+'?'+params.toString());
     const data = await resp.json();
     if(data.ok && data.filas && data.filas.length){
@@ -1092,7 +1181,7 @@ async function exportarExcelTraslado(){
   // Traer historial completo desde Sheets
   let historial = [];
   try{
-    const params = new URLSearchParams({action:'read_traslados',campo,cultivo,campania:camp});
+    const params = new URLSearchParams({ssId:userSSId,action:'read_traslados',campo,cultivo,campania:camp});
     const resp = await fetch(SHEETS_URL+'?'+params.toString());
     const data = await resp.json();
     if(data.ok && data.filas) historial = data.filas;
