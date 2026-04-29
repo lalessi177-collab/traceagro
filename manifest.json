@@ -4,7 +4,7 @@
   "description": "Sistema de trazabilidad de cosecha y traslados - Estanar S.A.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f4f6f4",
+  "background_color": "#ffffff",
   "theme_color": "#3B6D11",
   "orientation": "any",
   "icons": [
