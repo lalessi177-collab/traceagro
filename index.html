@@ -663,10 +663,10 @@ function renderCosecha(){
       <td><input type="number" value="${f.hum||''}" step="0.1" onchange="updF(${i},'hum',this.value);calcKgS(${i})" style="width:55px"/></td>
       <td class="kg-secos-cell"><input value="${f.kgS||''}" onchange="updF(${i},'kgS',this.value)" style="width:75px;color:#534AB7;font-weight:700"/></td>
       <td>
-        <select onchange="updF(${i},'destino',this.value);renderCosecha()">
+        <select onchange="updF(${i},'destino',this.value);renderCosecha()" style="font-size:13px">
           <option value="cam" ${f.destino==='cam'?'selected':''}>🚛 Camión</option>
-          <option value="silo" ${f.destino==='silo'?'selected':''}>🌾 Silo bolsa</option>
-          <option value="mov" ${f.destino==='mov'?'selected':''}>↔ Mov. interno</option>
+          <option value="silo" ${f.destino==='silo'?'selected':''}>🌾 Silo</option>
+          <option value="mov" ${f.destino==='mov'?'selected':''}>↔ Mov.int</option>
         </select>
       </td>
       <td id="cp-td-${i}">${renderCpSiloCell(f,i)}</td>
