@@ -396,7 +396,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 // ── CONFIG ──
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxFSYwyfy108Sk8aBivM-Bdj_7ufXZ_tl2iD3_VOsVgXT8zec365WAO4zuiQlpv9lA94g/exec';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbw4gIZ573OLM_yJKNL2exiRKp5nYK1MIELUQsDKUqoXkiDKB-2lZUg7V0E5Lr_XByNZeg/exec';
 const ZONAS = {
   'Oeste':    ['La Liliana','La Cecilia','La Payanca'],
   'Sudeste':  ['Namuncura','San Eustaquio','Algimar','La Querencia','Las Hayas del Moro','La Reforma'],
@@ -523,10 +523,22 @@ function iniciarApp(){
   document.getElementById('screen-register').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('hidden');
   document.getElementById('topbar-user').textContent = usuario;
+  // Limpiar datos de sesión anterior
+  filasCosecha = [];
+  filasTraslado = [];
+  silosStock = {};
+  silosHistoricos = [];
+  asientoActual = null;
+  asientoTraslado = null;
   // Inicializar selects de campo vacíos — se llenan al elegir zona
   ['c-campo','t-campo'].forEach(id=>{
     const sel = document.getElementById(id);
     if(sel) sel.innerHTML = '<option value="">— Elegir zona primero —</option>';
+  });
+  // Resetear zonas
+  ['c-zona','t-zona'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(sel) sel.value = '';
   });
   // Fecha hoy
   document.getElementById('c-fecha').value = hoy();
@@ -832,9 +844,13 @@ function cargarLocal(){
 
 // ── GOOGLE SHEETS ──
 async function guardarCosecha(){
+  const zona = document.getElementById('c-zona').value;
   const campo = document.getElementById('c-campo').value;
   const cultivo = document.getElementById('c-cultivo').value;
   const camp = document.getElementById('c-campania').value;
+  if(!zona){ showToast('⚠️ Seleccioná una Zona antes de guardar'); return; }
+  if(!campo){ showToast('⚠️ Seleccioná un Establecimiento antes de guardar'); return; }
+  if(!cultivo){ showToast('⚠️ Seleccioná un Cultivo antes de guardar'); return; }
   guardarLocal();
   const est = document.getElementById('estado-cosecha');
 
@@ -869,6 +885,7 @@ async function guardarCosecha(){
     const f = filasCosecha[i];
     if(!f.kgH) continue;
     const params = new URLSearchParams({
+      ssId: userSSId,
       action:'write_cosecha',
       campo, cultivo, campania:camp,
       tecnico: usuario, asiento: asientoActual,
@@ -1106,6 +1123,7 @@ async function guardarTraslado(){
     const f=filasTraslado[i];
     if(!f.kg||!f.silo) continue;
     const params=new URLSearchParams({
+      ssId:userSSId,
       action:'write_traslado_silo',
       campo,cultivo,campania:camp,tecnico:usuario,
       asiento:asientoTraslado,
@@ -1398,7 +1416,7 @@ function generarWorkbookCosecha(campo, cultivo, camp, filasParam) {
   const wb = XLSX.utils.book_new();
   const rows = [];
   rows.push([`${cultivo.toUpperCase()} — ${campo.toUpperCase()} — Campaña ${camp}`]);
-  rows.push([`Técnico: ${usuario}`, '', '', '', '', '', '', `Fecha descarga: ${hoy()}`]);
+  rows.push([`Técnico: ${usuario}`, '', '', '', '', '', '', '', `Fecha descarga: ${hoy()}`]);
   rows.push([]);
   
   const loteMap = {};
@@ -1443,7 +1461,27 @@ function generarWorkbookCosecha(campo, cultivo, camp, filasParam) {
   Object.entries(entradas).forEach(([n,e])=>{ rows.push([n,e,salidas[n]||0,e-(salidas[n]||0)]); });
   
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:12},{wch:8},{wch:6},{wch:12},{wch:10},{wch:11},{wch:8},{wch:10},{wch:12},{wch:18},{wch:13},{wch:20},{wch:20},{wch:18},{wch:18},{wch:9},{wch:9},{wch:6},{wch:8},{wch:10},{wch:12},{wch:12}];
+  
+  // Anchos de columna profesionales
+  ws['!cols'] = [
+    {wch:14},{wch:8},{wch:8},{wch:14},{wch:12},{wch:14},{wch:12},{wch:14},
+    {wch:14},{wch:22},{wch:15},{wch:20},{wch:20},{wch:18},{wch:18},
+    {wch:10},{wch:10},{wch:8},{wch:10},{wch:12},{wch:14},{wch:14}
+  ];
+  
+  // Merges para títulos
+  const merges = [];
+  merges.push({s:{r:0,c:0},e:{r:0,c:8}});  // Título principal
+  merges.push({s:{r:3,c:0},e:{r:3,c:7}});  // RESUMEN POR LOTE
+  const detalleRow = rows.findIndex(r => r[0] === 'DETALLE COMPLETO DE MOVIMIENTOS');
+  if(detalleRow >= 0) merges.push({s:{r:detalleRow,c:0},e:{r:detalleRow,c:8}});
+  const ccRow = rows.findIndex(r => r[0] === 'CUENTA CORRIENTE SILO BOLSA');
+  if(ccRow >= 0) merges.push({s:{r:ccRow,c:0},e:{r:ccRow,c:3}});
+  ws['!merges'] = merges;
+
+  // Altura de filas - título más alto
+  ws['!rows'] = [{hpt:28}]; // fila 1 más alta
+  
   XLSX.utils.book_append_sheet(wb, ws, 'Cosecha');
   return wb;
 }
