@@ -530,6 +530,14 @@ function iniciarApp(){
   silosHistoricos = [];
   asientoActual = null;
   asientoTraslado = null;
+  // Limpiar localStorage de datos de cosecha/traslado (no usuario/ssId)
+  const keysToRemove = [];
+  for(let i=0; i<localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('ta_cosecha_')) keysToRemove.push(k);
+    if(k && k.startsWith('ta_traslado_')) keysToRemove.push(k);
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
   // Inicializar selects de campo vacíos — se llenan al elegir zona
   ['c-campo','t-campo'].forEach(id=>{
     const sel = document.getElementById(id);
