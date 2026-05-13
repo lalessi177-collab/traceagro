@@ -909,15 +909,18 @@ async function guardarCosecha(){
   const est = document.getElementById('estado-cosecha');
 
   // Si ya tiene asiento, preguntar si quiere regrabar
+  let esRegrabado = false;
   if(asientoActual){
     if(!confirm(`Estas filas ya fueron guardadas como Asiento #${asientoActual}.\n¿Querés regrabarlas? (reemplaza lo anterior en Sheets)`)) return;
     est.textContent = `Regrabando Asiento #${asientoActual}...`;
-    // Borrar filas del asiento en Sheets
+    // Borrar filas del asiento en Sheets antes de reescribir
     try{
       const delParams = new URLSearchParams({ssId:userSSId,action:'update_cosecha',campo,cultivo,campania:camp,asiento:asientoActual});
-      await fetch(SHEETS_URL+'?'+delParams.toString());
-      await new Promise(r=>setTimeout(r,1000));
+      const delResp = await fetch(SHEETS_URL+'?'+delParams.toString());
+      await delResp.json();
+      await new Promise(r=>setTimeout(r,2000)); // esperar que Sheets procese el borrado
     }catch(e){ console.warn(e); }
+    esRegrabado = true;
   } else {
     // Obtener próximo número de asiento
     est.textContent = 'Preparando asiento...';
@@ -948,7 +951,8 @@ async function guardarCosecha(){
       kgH: f.kgH||0, hum: f.hum||'', kgS: f.kgS||0,
       destino: f.destino||'', cpSilo: f.cpSilo||'',
       chofer: f.chofer||'', embolso: f.embolso||'',
-      contratista: f.contratista||''
+      contratista: f.contratista||'',
+      sobreescribir: esRegrabado ? '1' : '0'  // saltear validación de duplicados al regrabar
     });
     try{
       const resp = await fetch(SHEETS_URL+'?'+params.toString());
