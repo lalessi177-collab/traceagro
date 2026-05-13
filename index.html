@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>TraceAgro Sync v2.1</title>
+<title>TraceAgro Sync v2.2-DEV</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#3B6D11"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -124,6 +124,22 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
   .totales-bar{grid-template-columns:1fr 1fr}
   .jornada-bar{flex-direction:column;align-items:flex-start}
 }
+
+/* MODAL FINNEGANS PREVIEW */
+.finn-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:8000;display:flex;align-items:center;justify-content:center;padding:16px}
+.finn-modal{background:#fff;border-radius:14px;width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.25)}
+.finn-modal-header{background:#1565C0;color:#fff;padding:14px 20px;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px}
+.finn-modal-header h3{font-size:15px;font-weight:700;flex:1}
+.finn-modal-body{flex:1;overflow-y:auto;padding:18px 20px}
+.finn-modal-footer{padding:14px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end;background:#fafafa;border-radius:0 0 14px 14px}
+.finn-section{margin-bottom:18px}
+.finn-section-title{font-size:11px;font-weight:700;text-transform:uppercase;color:#1565C0;letter-spacing:0.5px;border-bottom:2px solid #e3eaf7;padding-bottom:4px;margin-bottom:10px}
+.finn-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}
+.finn-field{display:flex;flex-direction:column;gap:2px}
+.finn-field label{font-size:10px;color:#888;font-weight:600}
+.finn-field .finn-val{font-size:13px;color:#222;font-weight:600;padding:4px 8px;background:#f4f6f8;border-radius:5px;min-height:26px}
+.finn-field .finn-val.empty{color:#bbb;font-weight:400;font-style:italic}
+.finn-field .finn-val.filled{background:#e8f5e9;color:#1b5e20}
 </style>
 </head>
 <body>
@@ -370,6 +386,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
                 <th style="width:110px">Chofer</th>
                 <th style="width:90px">Contrato</th>
                 <th style="width:110px">Transportista</th>
+                <th style="width:120px">Finnegans</th>
                 <th style="width:30px"></th>
               </tr>
             </thead>
@@ -380,11 +397,40 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
 
       <div class="actions-bar">
         <button class="btn btn-blue" onclick="guardarTraslado()">💾 Guardar en Sheets</button>
+        <button id="btn-enviar-finn" class="btn btn-sm" style="background:#2E7D32;color:#fff" onclick="enviarTodoAFinnegans()">🚀 Enviar a Finnegans</button>
         <button class="btn btn-sm btn-gray" onclick="exportarExcelTraslado()">⬇ Descargar Excel</button>
         <span id="estado-traslado" style="font-size:12px;color:#888"></span>
       </div>
+
+      <!-- Barra de progreso Finnegans -->
+      <div id="finn-progress-wrap" style="display:none;background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px 18px;margin-top:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:700;color:#1565C0">📤 Enviando a Finnegans...</span>
+          <span id="finn-progress-counter" style="font-size:12px;color:#555;font-weight:600"></span>
+        </div>
+        <div style="background:#e0e0e0;border-radius:6px;height:10px;overflow:hidden">
+          <div id="finn-progress-bar" style="height:10px;border-radius:6px;background:#1565C0;width:0%;transition:width 0.4s ease"></div>
+        </div>
+        <div id="finn-progress-log" style="margin-top:10px;max-height:120px;overflow-y:auto;font-size:11px;color:#444;display:flex;flex-direction:column;gap:3px"></div>
+      </div>
     </div>
 
+  </div>
+</div>
+
+<!-- MODAL PREVIEW FINNEGANS -->
+<div class="finn-overlay hidden" id="finn-overlay">
+  <div class="finn-modal">
+    <div class="finn-modal-header">
+      <span style="font-size:20px">📋</span>
+      <h3 id="finn-modal-title">Vista previa Finnegans</h3>
+      <button onclick="cerrarModalFinn()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;border-radius:6px;padding:2px 8px">✕</button>
+    </div>
+    <div class="finn-modal-body" id="finn-modal-body"></div>
+    <div class="finn-modal-footer">
+      <button onclick="cerrarModalFinn()" class="btn btn-gray btn-sm">Cancelar</button>
+      <button onclick="confirmarEnvioFinn()" class="btn btn-sm" style="background:#1565C0;color:#fff">✓ Confirmar envío</button>
+    </div>
   </div>
 </div>
 
@@ -1046,6 +1092,20 @@ function renderTraslado(){
   tbody.innerHTML='';
   filasTraslado.forEach((f,i)=>{
     const silosOpts = Object.keys(silosStock).map(n=>`<option value="${n}" ${f.silo===n?'selected':''}>${n}</option>`).join('');
+    
+    // Celda Finnegans: muestra estado según si fue enviada o no
+    let finnCell = '';
+    if(f.finnAsiento){
+      // Ya enviada a Finnegans — mostrar asiento con badge verde
+      finnCell = `<span style="background:#C6EFCE;color:#27500A;font-size:11px;font-weight:700;padding:3px 8px;border-radius:12px;white-space:nowrap">✓ #${f.finnAsiento}</span>`;
+    } else if(f._finnegans || f.cp){
+      // Tiene datos pero aún no fue enviada — botón enviar
+      finnCell = `<button onclick="verPrevistaFinnegans(${i})" style="background:#1565C0;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">📋 Ver y enviar</button>`;
+    } else {
+      // Sin CP cargada — no puede enviarse
+      finnCell = `<span style="color:#bbb;font-size:11px">Sin CP</span>`;
+    }
+
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td><input value="${f.fecha||''}" onchange="updT(${i},'fecha',this.value)" style="width:80px"/></td>
@@ -1069,6 +1129,7 @@ function renderTraslado(){
       <td><input value="${f.chofer||''}" onchange="updT(${i},'chofer',this.value)" style="width:105px"/></td>
       <td><input value="${f.contrato||''}" onchange="updT(${i},'contrato',this.value)" style="width:85px"/></td>
       <td><input value="${f.transporte||''}" onchange="updT(${i},'transporte',this.value)" style="width:105px"/></td>
+      <td style="text-align:center">${finnCell}</td>
       <td><button onclick="remT(${i})" style="background:none;border:none;color:#E24B4A;cursor:pointer;font-size:14px">✕</button></td>
     `;
     tbody.appendChild(tr);
@@ -1084,11 +1145,13 @@ async function subirPDFTraslado(input, rowIdx){
     const bytes = await file.arrayBuffer();
     pdfData['t'+rowIdx] = {name:(datos.nroCPE||file.name.replace('.pdf',''))+'.pdf', bytes};
     const f = filasTraslado[rowIdx];
-    f.cp        = datos.nroCPE || f.cp;
-    f.chofer    = datos.chofer || f.chofer;
-    f.destino   = datos.destino || f.destino;
-    f.transporte= datos.transporte || f.transporte;
-    f.kg        = datos.kgNeto || f.kg;
+    f.cp         = datos.nroCPE               || f.cp;
+    f.chofer     = datos.chofer?.nombre        || f.chofer;
+    f.destino    = datos.destino?.nombre       || f.destino;
+    f.transporte = datos.transportista?.nombre || f.transporte;
+    f.kg         = datos.kgNeto               || f.kg;
+    // Guardar datos completos para Finnegans
+    f._finnegans = datos;
     renderTraslado();
     showToast('✓ CP leída: '+datos.nroCPE);
   }catch(e){ showToast('Error leyendo PDF'); console.error(e); }
@@ -1096,6 +1159,317 @@ async function subirPDFTraslado(input, rowIdx){
 
 function updT(i,campo,val){ filasTraslado[i][campo]=val; }
 function remT(i){ filasTraslado.splice(i,1); renderTraslado(); }
+
+// ── ENVÍO A FINNEGANS ──
+
+let _finnIdxPendiente = null; // índice de la fila que está esperando confirmación
+
+function verPrevistaFinnegans(idx) {
+  const f = filasTraslado[idx];
+  if (!f.cp) { showToast('⚠️ Esta fila no tiene CP cargada'); return; }
+
+  const campo         = document.getElementById('t-campo').value;
+  const establecimiento = document.getElementById('t-campo').value;
+  const cultivo       = document.getElementById('t-cultivo').value;
+  const camp          = document.getElementById('t-campania').value;
+
+  const datosPDF = f._finnegans || {};
+  const contexto = { campo, establecimiento, cultivo, campania: camp };
+  const payload  = f._finnegans
+    ? prepararPayloadFinnegans(datosPDF, contexto)
+    : {
+        CartaDePorte:  f.cp,
+        Establecimiento: establecimiento,
+        Destino:       f.destino,
+        Chofer:        f.chofer,
+        Transportista: f.transporte,
+        Contrato:      f.contrato,
+        PesoNeto:      f.kg,
+      };
+
+  // Guardar índice para cuando confirmen
+  _finnIdxPendiente = idx;
+
+  // Título del modal
+  document.getElementById('finn-modal-title').textContent =
+    'Vista previa Finnegans — ' + (payload.CartaDePorte || f.cp);
+
+  // Construir cuerpo
+  function campo_finn(label, val) {
+    const vacio = !val || val === '' || val === 0;
+    return `<div class="finn-field">
+      <label>${label}</label>
+      <div class="finn-val ${vacio ? 'empty' : 'filled'}">${vacio ? '— sin dato —' : val}</div>
+    </div>`;
+  }
+
+  document.getElementById('finn-modal-body').innerHTML = `
+
+    <div class="finn-section">
+      <div class="finn-section-title">📄 Cabecera</div>
+      <div class="finn-grid">
+        ${campo_finn('Carta de Porte', payload.CartaDePorte)}
+        ${campo_finn('CTG', payload.CTG)}
+        ${campo_finn('Fecha', payload.Fecha)}
+        ${campo_finn('Vencimiento', payload.Vencimiento || datosPDF.vencimiento)}
+        ${campo_finn('Tipo CPE', payload.TipoCPE)}
+        ${campo_finn('Rol', payload.Rol)}
+      </div>
+    </div>
+
+    <div class="finn-section">
+      <div class="finn-section-title">👥 Intervinientes</div>
+      <div class="finn-grid">
+        ${campo_finn('Establecimiento', payload.Establecimiento)}
+        ${campo_finn('Titular', payload.Titular)}
+        ${campo_finn('Solicitante / Flete Pagador', payload.FletePagador)}
+        ${campo_finn('Corredor Venta Primaria', payload.CorrVtaPrimaria)}
+        ${campo_finn('Corredor Venta Secundaria', payload.CorrVtaSecundaria)}
+        ${campo_finn('Rte. Comercial VP', payload.RteVtaPrimaria)}
+        ${campo_finn('Rte. Comercial VS', payload.RteVtaSecundaria)}
+        ${campo_finn('Rte. Comercial VS2', payload.RteVtaSecundaria2)}
+        ${campo_finn('Rep. / Entregador', payload.RepEntregador)}
+        ${campo_finn('Rep. Recibidor', payload.RepRecibidor)}
+        ${campo_finn('Destinatario', payload.Destinatario)}
+        ${campo_finn('Destino', payload.Destino)}
+        ${campo_finn('Transportista', payload.Transportista)}
+        ${campo_finn('Chofer', payload.Chofer)}
+        ${campo_finn('Intermediario Flete', payload.Intermediario)}
+      </div>
+    </div>
+
+    <div class="finn-section">
+      <div class="finn-section-title">🌾 Datos del Grano</div>
+      <div class="finn-grid">
+        ${campo_finn('Producto', payload.Producto)}
+        ${campo_finn('Tipo de Grano', payload.TipoGrano)}
+        ${campo_finn('Cosecha', payload.Cosecha)}
+        ${campo_finn('Contrato', payload.Contrato)}
+        ${campo_finn('Declaración de Calidad', payload.DeclarCalidad)}
+        ${campo_finn('Observaciones', payload.Observaciones)}
+        ${campo_finn('N° Turno (Stop)', payload.NroTurnoStop)}
+        ${campo_finn('Peso Bruto (kg)', payload.PesoBruto ? payload.PesoBruto.toLocaleString('es-AR') : '')}
+        ${campo_finn('Peso Tara (kg)', payload.PesoTara ? payload.PesoTara.toLocaleString('es-AR') : '')}
+        ${campo_finn('Peso Neto (kg)', payload.PesoNeto ? payload.PesoNeto.toLocaleString('es-AR') : '')}
+      </div>
+    </div>
+
+    <div class="finn-section">
+      <div class="finn-section-title">📍 Procedencia</div>
+      <div class="finn-grid">
+        ${campo_finn('Localidad Procedencia', payload.LocalidadProcedencia)}
+        ${campo_finn('Provincia Procedencia', payload.ProvinciaProcedencia)}
+      </div>
+    </div>
+
+    <div class="finn-section">
+      <div class="finn-section-title">🏭 Destino de la Mercadería</div>
+      <div class="finn-grid">
+        ${campo_finn('N° Planta', payload.NroPlanta)}
+        ${campo_finn('Dirección', payload.DireccionDestino)}
+        ${campo_finn('Localidad Destino', payload.LocalidadDestino)}
+        ${campo_finn('Provincia Destino', payload.ProvinciaDestino)}
+      </div>
+    </div>
+
+    <div class="finn-section">
+      <div class="finn-section-title">🚛 Transporte</div>
+      <div class="finn-grid">
+        ${campo_finn('Patente', payload.Patente)}
+        ${campo_finn('Patente Acoplado', payload.PatenteAcoplado)}
+        ${campo_finn('Kms. a Recorrer', payload.KmsRecorrer)}
+        ${campo_finn('Tarifa', payload.Tarifa)}
+        ${campo_finn('Fecha / Hora Partida', payload.FechaPartida)}
+      </div>
+    </div>
+
+    ${f._finnegans ? '' : '<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:10px 14px;font-size:12px;color:#E65100;margin-top:4px">⚠️ Esta CP no tiene PDF cargado — los datos son los ingresados manualmente. Para mayor completitud, subí el PDF de la CP.</div>'}
+  `;
+
+  // Mostrar modal
+  document.getElementById('finn-overlay').classList.remove('hidden');
+}
+
+function cerrarModalFinn() {
+  document.getElementById('finn-overlay').classList.add('hidden');
+  _finnIdxPendiente = null;
+}
+
+async function confirmarEnvioFinn() {
+  if (_finnIdxPendiente === null) return;
+  cerrarModalFinn();
+  await enviarFilaAFinnegans(_finnIdxPendiente);
+}
+
+async function enviarFilaAFinnegans(idx) {
+  const f = filasTraslado[idx];
+  if (!f.cp) { showToast('⚠️ Esta fila no tiene CP cargada'); return; }
+  if (f.finnAsiento) {
+    if (!confirm(`Esta CP ya fue enviada a Finnegans (Asiento #${f.finnAsiento}).
+¿Querés reenviarla?`)) return;
+  }
+
+  const campo          = document.getElementById('t-campo').value;
+  const establecimiento = document.getElementById('t-campo').value;
+  const cultivo        = document.getElementById('t-cultivo').value;
+  const camp           = document.getElementById('t-campania').value;
+
+  // Construir payload con datos del PDF si están disponibles,
+  // completando con lo que el técnico ingresó manualmente
+  const datosPDF = f._finnegans || {};
+  const contexto = { campo, establecimiento, cultivo, campania: camp };
+  const payload  = f._finnegans
+    ? prepararPayloadFinnegans(datosPDF, contexto)
+    : {
+        CartaDePorte:  f.cp,
+        Establecimiento: establecimiento,
+        Destino:       f.destino,
+        Chofer:        f.chofer,
+        Transportista: f.transporte,
+        Contrato:      f.contrato,
+        PesoNeto:      f.kg,
+      };
+
+  // Marcar como "enviando"
+  f.finnEnviando = true;
+  renderTraslado();
+
+  try {
+    // ── SIMULACIÓN (sin API real todavía) ──
+    // Cuando tengamos la API de Finnegans, reemplazar este bloque por el fetch real:
+    // const resp = await fetch(FINNEGANS_URL, { method:'POST', headers:{...}, body: JSON.stringify(payload) });
+    // const data = await resp.json();
+    // f.finnAsiento = data.nroAsiento;
+
+    // Simulación: esperar 1.2s y devolver asiento fake para probar el flujo
+    await new Promise(r => setTimeout(r, 1200));
+    const asientoSimulado = 'SIM-' + String(Math.floor(Math.random()*9000)+1000);
+    f.finnAsiento  = asientoSimulado;
+    f.finnPayload  = payload; // guardar payload para debug/log
+    f.finnEnviando = false;
+
+    // Guardar el asiento Finnegans en el Sheet también
+    await guardarAsientoFinnegansEnSheet(f, campo, cultivo, camp);
+
+    renderTraslado();
+    showToast(`✓ CP ${f.cp} enviada — Asiento Finnegans: ${asientoSimulado}`, 4000);
+
+  } catch(e) {
+    f.finnEnviando = false;
+    f.finnError    = true;
+    renderTraslado();
+    showToast('❌ Error al enviar a Finnegans: ' + e.message, 4000);
+    console.error('Finnegans error:', e, 'Payload:', payload);
+  }
+}
+
+async function enviarTodoAFinnegans() {
+  const pendientes = filasTraslado.filter(f => f.cp && !f.finnAsiento);
+  if (!pendientes.length) {
+    showToast('No hay CPs pendientes de envío a Finnegans');
+    return;
+  }
+  if (!confirm(`Se van a enviar ${pendientes.length} CP(s) a Finnegans. ¿Confirmás?`)) return;
+
+  const total   = pendientes.length;
+  const est     = document.getElementById('estado-traslado');
+  const wrap    = document.getElementById('finn-progress-wrap');
+  const bar     = document.getElementById('finn-progress-bar');
+  const counter = document.getElementById('finn-progress-counter');
+  const log     = document.getElementById('finn-progress-log');
+  const btnEnviar = document.getElementById('btn-enviar-finn');
+
+  // Mostrar barra y deshabilitar botón
+  wrap.style.display = 'block';
+  log.innerHTML = '';
+  bar.style.width = '0%';
+  bar.style.background = '#1565C0';
+  btnEnviar.disabled = true;
+  btnEnviar.style.opacity = '0.5';
+
+  let enviadas = 0, errores = 0, procesadas = 0;
+
+  function logLinea(texto, color) {
+    const div = document.createElement('div');
+    div.style.color = color || '#444';
+    div.textContent = texto;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function actualizarBarra() {
+    procesadas++;
+    const pct = Math.round(procesadas / total * 100);
+    bar.style.width = pct + '%';
+    counter.textContent = `${procesadas} de ${total}`;
+  }
+
+  for (let i = 0; i < filasTraslado.length; i++) {
+    const f = filasTraslado[i];
+    if (!f.cp || f.finnAsiento) continue;
+
+    est.textContent = `Enviando CP ${f.cp}...`;
+    counter.textContent = `${procesadas + 1} de ${total}`;
+    logLinea(`⏳ Enviando ${f.cp}...`, '#1565C0');
+
+    try {
+      await enviarFilaAFinnegans(i);
+      enviadas++;
+      actualizarBarra();
+      // Reemplazar la línea de espera con el resultado
+      log.lastChild.textContent = `✓ ${f.cp} → Asiento Finnegans: ${f.finnAsiento}`;
+      log.lastChild.style.color = '#27500A';
+      log.lastChild.style.fontWeight = '700';
+    } catch(e) {
+      errores++;
+      actualizarBarra();
+      log.lastChild.textContent = `❌ ${f.cp} → Error: ${e.message}`;
+      log.lastChild.style.color = '#E24B4A';
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Resultado final
+  const sinError = errores === 0;
+  bar.style.background  = sinError ? '#2E7D32' : '#E24B4A';
+  bar.style.width       = '100%';
+  counter.textContent   = sinError
+    ? `✓ ${enviadas} enviadas correctamente`
+    : `${enviadas} OK — ${errores} con error`;
+
+  const msg = `✓ Finnegans: ${enviadas} enviadas${errores ? ` — ❌ ${errores} errores` : ''}`;
+  est.textContent = msg + ' — ' + new Date().toLocaleTimeString('es-AR');
+  showToast(msg, 4000);
+
+  // Re-habilitar botón y ocultar barra después de 6 segundos
+  btnEnviar.disabled = false;
+  btnEnviar.style.opacity = '1';
+  setTimeout(() => { wrap.style.display = 'none'; }, 6000);
+}
+
+async function guardarAsientoFinnegansEnSheet(f, campo, cultivo, camp) {
+  // Guarda el número de asiento de Finnegans en la hoja de Sheets
+  // para tener trazabilidad completa CP ↔ Asiento Finnegans
+  try {
+    const params = new URLSearchParams({
+      ssId:        userSSId,
+      action:      'update_finnegans_asiento',
+      campo,
+      cultivo,
+      campania:    camp,
+      cp:          f.cp,
+      finnAsiento: f.finnAsiento
+    });
+    const resp = await fetch(SHEETS_URL + '?' + params.toString());
+    const data = await resp.json();
+    if (!data.ok) {
+      console.warn('No se pudo guardar asiento Finnegans en Sheet:', data.error);
+    }
+  } catch(e) {
+    console.warn('Error guardando asiento Finnegans en Sheet:', e.message);
+    // No bloquear el flujo si falla el guardado en Sheet
+  }
+}
 
 async function guardarTraslado(){
   const campo=document.getElementById('t-campo').value;
@@ -1254,7 +1628,8 @@ async function exportarExcelTraslado(){
 }
 
 
-// ── PDF PARSING ──
+// ── PDF PARSING v2.2-DEV ──
+// Extrae todos los campos necesarios para Finnegans
 const pdfData = {}; // {rowId: {name, bytes}}
 
 async function parsePDF(file) {
@@ -1263,91 +1638,336 @@ async function parsePDF(file) {
   const page = await pdf.getPage(1);
   const ct = await page.getTextContent();
   
+  // Construir mapa de filas ordenadas por posición Y (de arriba a abajo)
   const rowMap = {};
   ct.items.forEach(item => {
-    const y = Math.round(item.transform[5]/2)*2;
-    if(!rowMap[y]) rowMap[y] = [];
-    rowMap[y].push({text: item.str.trim(), x: Math.round(item.transform[4])});
+    const y = Math.round(item.transform[5] / 2) * 2;
+    if (!rowMap[y]) rowMap[y] = [];
+    rowMap[y].push({ text: item.str.trim(), x: Math.round(item.transform[4]) });
   });
-  const rows = Object.keys(rowMap).map(Number).sort((a,b)=>b-a)
+  const rows = Object.keys(rowMap).map(Number).sort((a, b) => b - a)
     .map(y => ({
-      full: rowMap[y].sort((a,b)=>a.x-b.x).map(i=>i.text).join(' ').trim()
+      full: rowMap[y].sort((a, b) => a.x - b.x).map(i => i.text).join(' ').trim()
     }));
   
-  const allText = rows.map(r=>r.full).join(' ');
-  
-  const mCP  = allText.match(/(\d{5}-\d{8})/);
-  const mCTG = allText.match(/CTG[\s:]+(\d{7,})/i);
-  let fechaCPE = '';
-  for(const r of rows){
-    const m = r.full.match(/Fecha[\s:]+(\d{2}\/\d{2}\/\d{4})/);
-    if(m){ fechaCPE=m[1]; break; }
-  }
-  
-  function byLabel(label){
-    for(const r of rows){
-      if(r.full.toLowerCase().includes(label.toLowerCase())){
-        const idx2 = r.full.toLowerCase().indexOf(label.toLowerCase());
-        return r.full.slice(idx2+label.length).replace(/^[\s:]+/,'').trim();
+  const allText = rows.map(r => r.full).join('\n');
+
+  // ── Helpers ──
+  // Busca el texto que sigue a una etiqueta en la misma línea
+  function byLabel(label) {
+    for (const r of rows) {
+      const lo = r.full.toLowerCase();
+      const labelLo = label.toLowerCase();
+      if (lo.includes(labelLo)) {
+        const idx = lo.indexOf(labelLo);
+        return r.full.slice(idx + label.length).replace(/^[\s:]+/, '').trim();
       }
     }
     return '';
   }
-  function nombre(s){
-    if(!s) return '';
+  // Extrae solo el nombre de "CUIT - NOMBRE EMPRESA"
+  function soloNombre(s) {
+    if (!s) return '';
     const m = s.match(/\d{11}\s*[-–]\s*(.+)/);
     return m ? m[1].trim() : s.trim();
   }
+  // Extrae CUIT del formato "CUIT - NOMBRE" o "XX-XXXXXXXX-X"
+  function soloCuit(s) {
+    if (!s) return '';
+    const m = s.match(/(\d{11})/);
+    return m ? m[1] : '';
+  }
+  // Formatea CUIT como XX-XXXXXXXX-X
+  function formatCuit(c) {
+    if (!c || c.length !== 11) return c;
+    return `${c.slice(0,2)}-${c.slice(2,10)}-${c.slice(10)}`;
+  }
+
+  // ── Campos de cabecera ──
+  const mCP  = allText.match(/(\d{5}-\d{8})/);
+  const mCTG = allText.match(/CTG[\s:]+(\d{7,})/i);
   
-  const destinatario = nombre(byLabel('Destinatario'));
-  const destino      = nombre(byLabel('Destino'));
-  const transporte   = nombre(byLabel('Empresa Transportista'));
-  const chofer       = nombre(byLabel('Chofer'));
-  const contrato     = byLabel('Contrato').split(' ')[0] || '';
-  
-  // Pesos — buscar en líneas específicas con números razonables (1000-99999 kg)
-  let kgBruto=0, kgTara=0, kgNeto=0;
-  for(const r of rows){
+  let fechaCPE = '';
+  for (const r of rows) {
+    const m = r.full.match(/Fecha[\s:]+(\d{2}\/\d{2}\/\d{4})/);
+    if (m) { fechaCPE = m[1]; break; }
+  }
+  let vencimiento = '';
+  for (const r of rows) {
+    const m = r.full.match(/Vencimiento[\s:]+(\d{2}\/\d{2}\/\d{4})/i);
+    if (m) { vencimiento = m[1]; break; }
+  }
+
+  // ── Sección A: Intervinientes ──
+  // Cada campo puede o no venir según el contrato
+  function extraerInterviniente(label) {
+    const raw = byLabel(label);
+    if (!raw) return { nombre: '', cuit: '' };
+    return { nombre: soloNombre(raw), cuit: formatCuit(soloCuit(raw)) };
+  }
+
+  const titular        = extraerInterviniente('Titular Carta de Porte:');
+  const remitente      = extraerInterviniente('Remitente Comercial Productor:');
+  const rteVtaPrim     = extraerInterviniente('Rte. Comercial Venta Primaria:');
+  const rteVtaSec      = extraerInterviniente('Rte. Comercial Venta secundaria:');
+  const rteVtaSec2     = extraerInterviniente('Rte. Comercial Venta secundaria 2:');
+  const corrVtaPrim    = extraerInterviniente('Corredor Venta Primaria:');
+  const corrVtaSec     = extraerInterviniente('Corredor Venta Secundaria:');
+  const repEntregador  = extraerInterviniente('Representante entregador:');
+  const repRecibidor   = extraerInterviniente('Representante recibidor:');
+  const destinatario   = extraerInterviniente('Destinatario:');
+  const destino        = extraerInterviniente('Destino:');
+  const transportista  = extraerInterviniente('Empresa Transportista:');
+  const fletePagador   = extraerInterviniente('Flete pagador :');
+  const choferRaw      = extraerInterviniente('Chofer :');
+  const intermediario  = extraerInterviniente('Intermediario de flete :');
+
+  // ── Sección B: Grano ──
+  let grano = '', tipoGrano = '', campania = '';
+  for (const r of rows) {
+    if (r.full.toLowerCase().includes('grano /') || r.full.toLowerCase().includes('grano/')) {
+      const m = r.full.match(/Grano\s*\/\s*(\w[\w\s]*?)(?:\s{2,}|\s+Tipo[\s:])/i);
+      if (m) grano = m[1].trim();
+      const mt = r.full.match(/Tipo[\s:]+(\w+)/i);
+      if (mt) tipoGrano = mt[1].trim();
+      const mc = r.full.match(/Campa[ñn]a[\s:]+(\d{4})/i);
+      if (mc) campania = mc[1];
+    }
+  }
+
+  let declarCalidad = '';
+  for (const r of rows) {
+    if (r.full.includes('DECLARACIÓN DE CALIDAD') || r.full.includes('Conforme') || r.full.includes('Condicional')) {
+      if (r.full.toLowerCase().includes('conforme')) declarCalidad = 'Conforme';
+      else if (r.full.toLowerCase().includes('condicional')) declarCalidad = 'Condicional';
+    }
+  }
+
+  // Observaciones
+  let observaciones = '';
+  for (const r of rows) {
+    if (r.full.toLowerCase().startsWith('observaciones:')) {
+      observaciones = r.full.replace(/^observaciones:/i, '').trim();
+      break;
+    }
+  }
+
+  // ── Sección C: Procedencia ──
+  let localidadOrigen = '', provinciaOrigen = '';
+  for (const r of rows) {
+    if (r.full.toLowerCase().includes('localidad:') && r.full.toLowerCase().includes('provincia')) {
+      const ml = r.full.match(/Localidad:\s*([A-ZÁÉÍÓÚ\s]+?)(?:\s{2,}|Provincia)/i);
+      if (ml) localidadOrigen = ml[1].trim();
+      const mp = r.full.match(/Provincia\s+([A-ZÁÉÍÓÚ\s]+?)(?:\s{2,}|$)/i);
+      if (mp) provinciaOrigen = mp[1].trim();
+    }
+  }
+
+  // ── Sección D: Destino mercadería ──
+  let nroPlanta = '', dirDestino = '', localidadDestino = '', provinciaDestino = '';
+  for (const r of rows) {
+    if (r.full.match(/N°\s*Planta\s+\d+/i)) {
+      const mp = r.full.match(/N°\s*Planta\s+(\d+)/i);
+      if (mp) nroPlanta = mp[1];
+      const md = r.full.match(/Direcci[oó]n:\s*(.+?)(?:\s{3,}|$)/i);
+      if (md) dirDestino = md[1].trim();
+    }
+    if (r.full.match(/Localidad:\s*\w/) && r.full.match(/Provincia:/i) && !localidadDestino) {
+      // segunda ocurrencia de localidad (destino)
+    }
+  }
+  // Localidad y provincia del destino (segunda aparición)
+  let localidadDestinoCount = 0;
+  for (const r of rows) {
+    if (r.full.match(/^Localidad:\s*([A-ZÁÉÍÓÚ]+)/i)) {
+      localidadDestinoCount++;
+      if (localidadDestinoCount === 2) {
+        const m = r.full.match(/Localidad:\s*([A-ZÁÉÍÓÚ\s]+?)(?:\s{2,}|Provincia:|$)/i);
+        if (m) localidadDestino = m[1].trim();
+        const mp = r.full.match(/Provincia:\s*([A-ZÁÉÍÓÚ\s]+?)(?:\s{2,}|$)/i);
+        if (mp) provinciaDestino = mp[1].trim();
+      }
+    }
+  }
+
+  // ── Sección E: Transporte ──
+  let dominios = '', partida = '', kms = '', tarifa = '';
+  for (const r of rows) {
+    if (r.full.toLowerCase().includes('dominios:')) {
+      const md = r.full.match(/Dominios:\s*([\w-]+(?:\s*-\s*[\w-]+)*)/i);
+      if (md) dominios = md[1].trim();
+    }
+    if (r.full.toLowerCase().includes('partida:')) {
+      const mp = r.full.match(/Partida:\s*(\d{2}\/\d{2}\/\d{4}\s+[\d:]+)/i);
+      if (mp) partida = mp[1].trim();
+    }
+    if ((r.full.includes('Km.') || r.full.includes('Kms.')) && r.full.toLowerCase().includes('recorrer')) {
+      const mk = r.full.match(/recorrer[\s:]+(\d+)/i);
+      if (mk) kms = mk[1];
+    }
+    if (r.full.includes('Tarifa:')) {
+      const mt = r.full.match(/Tarifa[\s:]+([0-9.,]+)/);
+      if (mt) tarifa = mt[1];
+    }
+  }
+  // Separar patente y acoplado de dominios (ej: "EQC942 - UDP663")
+  let patente = '', patenteAcoplado = '';
+  if (dominios) {
+    const partes = dominios.split(/\s*-\s*/);
+    patente = partes[0] || '';
+    patenteAcoplado = partes[1] || '';
+  }
+
+  // ── Pesos ──
+  let kgBruto = 0, kgTara = 0, kgNeto = 0;
+  for (const r of rows) {
     const line = r.full;
-    if(line.includes('Peso Bruto') && line.includes('Peso Tara')){
-      // Extraer números entre 1000 y 999999 kg
-      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
-      if(nums.length>=2){ kgBruto=nums[0]; kgTara=nums[1]; }
-      else if(nums.length===1){ kgBruto=nums[0]; }
+    if (line.includes('Peso Bruto') && line.includes('Peso Tara')) {
+      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m => parseInt(m[1])).filter(n => n >= 1000 && n <= 999999);
+      if (nums.length >= 2) { kgBruto = nums[0]; kgTara = nums[1]; }
+      else if (nums.length === 1) { kgBruto = nums[0]; }
     }
-    if(line.includes('Peso Bruto') && !line.includes('Peso Tara')){
-      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
-      if(nums.length) kgBruto=nums[0];
-    }
-    if(line.includes('Peso Tara') && !line.includes('Peso Bruto')){
-      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
-      if(nums.length) kgTara=nums[0];
-    }
-    if(line.includes('Peso Neto') && !line.includes('Peso Bruto')){
-      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m=>parseInt(m[1])).filter(n=>n>=1000&&n<=999999);
-      if(nums.length) kgNeto=nums[0];
+    if (line.includes('Peso Neto') && !line.includes('Peso Bruto')) {
+      const nums = [...line.matchAll(/\b(\d{4,6})\b/g)].map(m => parseInt(m[1])).filter(n => n >= 1000 && n <= 999999);
+      if (nums.length) kgNeto = nums[0];
     }
   }
-  if(!kgNeto && kgBruto && kgTara) kgNeto = kgBruto - kgTara;
-  
-  let kms='', tarifa='';
-  for(const r of rows){
-    if((r.full.includes('Km.') || r.full.includes('Kms.')) && r.full.toLowerCase().includes('recorrer')){
-      const m2 = r.full.match(/recorrer[\s:]+(\d+)/i);
-      if(m2) kms=m2[1];
-    }
-    if(r.full.includes('Tarifa:')){
-      const m3 = r.full.match(/Tarifa[\s:]+([0-9.,]+)/);
-      if(m3) tarifa=m3[1];
-    }
+  if (!kgNeto && kgBruto && kgTara) kgNeto = kgBruto - kgTara;
+
+  // ── Número de turno (descarga) ──
+  let nroTurno = '';
+  for (const r of rows) {
+    const m = r.full.match(/N°\s*Turno[\s:]+([A-Z0-9]+)/i);
+    if (m) { nroTurno = m[1]; break; }
   }
-  
+
+  // ── Contrato ──
+  const contratoRaw = byLabel('Contrato').split(/\s+/)[0] || '';
+  // Observaciones puede tener el contrato en otro formato: "OV 26G05 TP 1024"
+  // Extraer número de contrato de observaciones si está en el formato "TP XXXX"
+  let nroContrato = contratoRaw;
+  if (!nroContrato && observaciones) {
+    const mc = observaciones.match(/TP\s+(\d+)/i);
+    if (mc) nroContrato = mc[1];
+  }
+
+  // ── Resultado completo ──
   return {
-    nroCPE: mCP ? mCP[1] : file.name.replace('.pdf',''),
-    ctg: mCTG ? mCTG[1] : '',
-    fechaCPE, contrato, destinatario, destino, transporte, chofer,
-    kgBruto, kgTara, kgNeto, kms, tarifa
+    // Cabecera
+    nroCPE:        mCP ? mCP[1] : file.name.replace('.pdf', ''),
+    ctg:           mCTG ? mCTG[1] : '',
+    fechaCPE,
+    vencimiento,
+    // Intervinientes (solo los que vienen en el PDF)
+    titular,
+    remitente,
+    rteVtaPrim,
+    rteVtaSec,
+    rteVtaSec2,
+    corrVtaPrim,
+    corrVtaSec,
+    repEntregador,
+    repRecibidor,
+    destinatario,
+    destino,
+    transportista,
+    fletePagador,
+    chofer:        choferRaw,
+    intermediario,
+    // Grano
+    grano,
+    tipoGrano,
+    campania,
+    declarCalidad,
+    observaciones,
+    contrato:      nroContrato,
+    // Procedencia
+    localidadOrigen,
+    provinciaOrigen,
+    // Destino
+    nroPlanta,
+    dirDestino,
+    localidadDestino,
+    provinciaDestino,
+    // Transporte
+    patente,
+    patenteAcoplado,
+    partida,
+    kms,
+    tarifa,
+    nroTurno,
+    // Pesos
+    kgBruto,
+    kgTara,
+    kgNeto,
   };
+}
+
+// ── PREPARAR PAYLOAD FINNEGANS ──
+// Convierte los datos del PDF al formato que necesita la API de Finnegans
+// Los campos opcionales solo se incluyen si tienen valor
+function prepararPayloadFinnegans(datos, contexto) {
+  // contexto: { campo, cultivo, campania, establecimiento, rol, tipoCPE }
+  const payload = {
+    // Cabecera — siempre presentes
+    CartaDePorte:  datos.nroCPE,
+    CTG:           datos.ctg,
+    Fecha:         datos.fechaCPE,
+    TipoCPE:       contexto.tipoCPE || '74 - CP - Automotor',
+    Rol:           contexto.rol     || 'Productor',
+
+    // Intervinientes — solo si tienen valor
+    ...(datos.titular?.nombre       && { Titular:           datos.titular.nombre,       TitularCUIT:       datos.titular.cuit }),
+    ...(datos.remitente?.nombre     && { Remitente:         datos.remitente.nombre,     RemitenteCUIT:     datos.remitente.cuit }),
+    ...(datos.rteVtaPrim?.nombre    && { RteVtaPrimaria:    datos.rteVtaPrim.nombre,    RteVtaPrimCUIT:    datos.rteVtaPrim.cuit }),
+    ...(datos.rteVtaSec?.nombre     && { RteVtaSecundaria:  datos.rteVtaSec.nombre,     RteVtaSecCUIT:     datos.rteVtaSec.cuit }),
+    ...(datos.rteVtaSec2?.nombre    && { RteVtaSecundaria2: datos.rteVtaSec2.nombre,    RteVtaSec2CUIT:    datos.rteVtaSec2.cuit }),
+    ...(datos.corrVtaPrim?.nombre   && { CorrVtaPrimaria:   datos.corrVtaPrim.nombre,   CorrVtaPrimCUIT:   datos.corrVtaPrim.cuit }),
+    ...(datos.corrVtaSec?.nombre    && { CorrVtaSecundaria: datos.corrVtaSec.nombre,    CorrVtaSecCUIT:    datos.corrVtaSec.cuit }),
+    ...(datos.repEntregador?.nombre && { RepEntregador:     datos.repEntregador.nombre, RepEntregadorCUIT: datos.repEntregador.cuit }),
+    ...(datos.repRecibidor?.nombre  && { RepRecibidor:      datos.repRecibidor.nombre,  RepRecibidorCUIT:  datos.repRecibidor.cuit }),
+    ...(datos.destinatario?.nombre  && { Destinatario:      datos.destinatario.nombre,  DestinatarioCUIT:  datos.destinatario.cuit }),
+    ...(datos.destino?.nombre       && { Destino:           datos.destino.nombre,       DestinoCUIT:       datos.destino.cuit }),
+    ...(datos.transportista?.nombre && { Transportista:     datos.transportista.nombre, TransportistaCUIT: datos.transportista.cuit }),
+    ...(datos.fletePagador?.nombre  && { FletePagador:      datos.fletePagador.nombre,  FletePagadorCUIT:  datos.fletePagador.cuit }),
+    ...(datos.chofer?.nombre        && { Chofer:            datos.chofer.nombre,        ChoferCUIT:        datos.chofer.cuit }),
+    ...(datos.intermediario?.nombre && { Intermediario:     datos.intermediario.nombre, IntermediarioCUIT: datos.intermediario.cuit }),
+
+    // Establecimiento (viene del contexto, no del PDF)
+    ...(contexto.establecimiento    && { Establecimiento: contexto.establecimiento }),
+
+    // Grano
+    Producto:        datos.grano,
+    TipoGrano:       datos.tipoGrano,
+    Cosecha:         datos.campania ? `CAMPAÑA ${datos.campania.slice(0,2)}-${datos.campania.slice(2)}` : '',
+    DeclarCalidad:   datos.declarCalidad,
+    ...(datos.contrato    && { Contrato: datos.contrato }),
+    ...(datos.observaciones && { Observaciones: datos.observaciones }),
+    ...(datos.nroTurno    && { NroTurnoStop: datos.nroTurno }),
+
+    // Pesos
+    PesoBruto: datos.kgBruto,
+    PesoTara:  datos.kgTara,
+    PesoNeto:  datos.kgNeto,
+
+    // Procedencia
+    ...(datos.localidadOrigen  && { LocalidadProcedencia: datos.localidadOrigen }),
+    ...(datos.provinciaOrigen  && { ProvinciaProcedencia:  datos.provinciaOrigen }),
+
+    // Destino mercadería
+    ...(datos.nroPlanta        && { NroPlanta:         datos.nroPlanta }),
+    ...(datos.dirDestino       && { DireccionDestino:  datos.dirDestino }),
+    ...(datos.localidadDestino && { LocalidadDestino:  datos.localidadDestino }),
+    ...(datos.provinciaDestino && { ProvinciaDestino:  datos.provinciaDestino }),
+
+    // Transporte
+    ...(datos.patente          && { Patente:           datos.patente }),
+    ...(datos.patenteAcoplado  && { PatenteAcoplado:   datos.patenteAcoplado }),
+    ...(datos.kms              && { KmsRecorrer:        datos.kms }),
+    ...(datos.tarifa           && { Tarifa:             datos.tarifa }),
+    ...(datos.partida          && { FechaPartida:       datos.partida }),
+  };
+  return payload;
 }
 
 async function subirPDFCosecha(input, rowIdx) {
@@ -1360,26 +1980,37 @@ async function subirPDFCosecha(input, rowIdx) {
     const bytes = await file.arrayBuffer();
     pdfData[rowIdx] = { name: (datos.nroCPE||file.name.replace('.pdf',''))+'.pdf', bytes };
     
-    // Llenar fila
+    // Llenar fila con campos básicos (los que ya usaba)
     const f = filasCosecha[rowIdx];
-    f.cpSilo   = datos.nroCPE || f.cpSilo;
-    f.chofer   = datos.chofer || f.chofer;
-    f.contrato = datos.contrato || f.contrato;
-    f.kgH      = datos.kgNeto || f.kgH;
-    f.kgS      = datos.kgNeto || f.kgS;
-    // Guardar datos extendidos
-    f.ctg        = datos.ctg;
-    f.fechaCPE   = datos.fechaCPE;
-    f.destinatario = datos.destinatario;
-    f.destino2   = datos.destino;
-    f.transporte = datos.transporte;
-    f.kgBruto    = datos.kgBruto;
-    f.kgTara     = datos.kgTara;
-    f.kms        = datos.kms;
-    f.tarifa     = datos.tarifa;
-    
+    f.cpSilo     = datos.nroCPE          || f.cpSilo;
+    f.chofer     = datos.chofer?.nombre  || f.chofer;
+    f.contrato   = datos.contrato        || f.contrato;
+    f.kgH        = datos.kgNeto          || f.kgH;
+    f.kgS        = datos.kgNeto          || f.kgS;
+
+    // Guardar datos extendidos para Finnegans y Excel
+    f.ctg              = datos.ctg;
+    f.fechaCPE         = datos.fechaCPE;
+    f.vencimiento      = datos.vencimiento;
+    f.destinatario     = datos.destinatario?.nombre || '';
+    f.destino2         = datos.destino?.nombre      || '';
+    f.transporte       = datos.transportista?.nombre || '';
+    f.kgBruto          = datos.kgBruto;
+    f.kgTara           = datos.kgTara;
+    f.kms              = datos.kms;
+    f.tarifa           = datos.tarifa;
+    // Datos completos para Finnegans (objeto completo del PDF)
+    f._finnegans       = datos;
+
     renderCosecha();
-    showToast('✓ CP leída: ' + datos.nroCPE);
+    // Mostrar resumen de lo extraído
+    const campos = [
+      datos.nroCPE          && `CP: ${datos.nroCPE}`,
+      datos.ctg             && `CTG: ${datos.ctg}`,
+      datos.chofer?.nombre  && `Chofer: ${datos.chofer.nombre}`,
+      datos.kgNeto          && `Neto: ${datos.kgNeto} kg`,
+    ].filter(Boolean).join(' | ');
+    showToast('✓ CP leída — ' + campos, 4000);
   } catch(e) {
     showToast('Error leyendo el PDF');
     console.error(e);
