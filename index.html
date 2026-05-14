@@ -379,14 +379,16 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
             <thead>
               <tr>
                 <th style="width:85px">Fecha</th>
-                <th style="width:160px">Silo de origen</th>
-                <th style="width:80px">Kg</th>
-                <th style="width:140px">Carta de Porte</th>
-                <th style="width:140px">Destino</th>
-                <th style="width:110px">Chofer</th>
-                <th style="width:90px">Contrato</th>
-                <th style="width:110px">Transportista</th>
-                <th style="width:120px">Finnegans</th>
+                <th style="width:140px">Silo 1</th>
+                <th style="width:75px">Kg 1</th>
+                <th style="width:140px">Silo 2</th>
+                <th style="width:75px">Kg 2</th>
+                <th style="width:130px">Carta de Porte</th>
+                <th style="width:130px">Destino</th>
+                <th style="width:100px">Chofer</th>
+                <th style="width:85px">Contrato</th>
+                <th style="width:100px">Transportista</th>
+                <th style="width:110px">Finnegans</th>
                 <th style="width:30px"></th>
               </tr>
             </thead>
@@ -907,6 +909,10 @@ function actualizarSilos(){
       if(!salidas[f.silo]) salidas[f.silo]=0;
       salidas[f.silo] += parseFloat(f.kg)||0;
     }
+    if(f.silo2){
+      if(!salidas[f.silo2]) salidas[f.silo2]=0;
+      salidas[f.silo2] += parseFloat(f.kg2)||0;
+    }
   });
   // Render
   const grid = document.getElementById('silo-grid');
@@ -1352,29 +1358,49 @@ function renderTraslado(){
       finnCell = `<span style="color:#bbb;font-size:11px">Sin CP</span>`;
     }
 
+    // Opciones para silo2 (mismos silos disponibles)
+    const silosOpts2 = `<option value="">— Sin silo 2 —</option>` + 
+      Object.keys(silosStock).map(n=>`<option value="${n}" ${f.silo2===n?'selected':''}>${n}</option>`).join('');
+
+    // Alerta saldo negativo silo1
+    const saldo1 = silosStock[f.silo] !== undefined ? silosStock[f.silo] : null;
+    const alertaSilo1 = (saldo1 !== null && parseFloat(f.kg||0) > saldo1)
+      ? `<span style="color:#E24B4A;font-size:10px;font-weight:700">⚠️ Excede saldo (${saldo1.toLocaleString('es-AR')} kg)</span>` : '';
+
+    // Alerta saldo negativo silo2
+    const saldo2 = f.silo2 && silosStock[f.silo2] !== undefined ? silosStock[f.silo2] : null;
+    const alertaSilo2 = (saldo2 !== null && parseFloat(f.kg2||0) > saldo2)
+      ? `<span style="color:#E24B4A;font-size:10px;font-weight:700">⚠️ Excede saldo (${saldo2.toLocaleString('es-AR')} kg)</span>` : '';
+
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td><input value="${f.fecha||''}" onchange="updT(${i},'fecha',this.value)" style="width:80px"/></td>
       <td>
-        <select onchange="updT(${i},'silo',this.value)" style="width:155px">
+        <select onchange="updT(${i},'silo',this.value);renderTraslado()" style="width:135px">
           <option value="">— Seleccionar —</option>
           ${silosOpts}
-          <option value="__manual__" ${f.silo&&!silosStock[f.silo]?'selected':''}>Otro (manual)</option>
         </select>
-        ${(!silosOpts || (f.silo && !silosStock[f.silo]))?`<input placeholder="Nombre del silo" value="${f.silo||''}" onchange="updT(${i},'silo',this.value)" style="width:155px;margin-top:2px"/>`:''}
+        ${alertaSilo1}
       </td>
-      <td><input type="number" value="${f.kg||''}" onchange="updT(${i},'kg',this.value);actualizarSilos()" style="width:75px"/></td>
+      <td><input type="number" value="${f.kg||''}" onchange="updT(${i},'kg',this.value);actualizarSilos();renderTraslado()" style="width:70px"/></td>
       <td>
-        <input value="${f.cp||''}" placeholder="00001-..." onchange="updT(${i},'cp',this.value)" style="width:100px"/>
+        <select onchange="updT(${i},'silo2',this.value);renderTraslado()" style="width:135px">
+          ${silosOpts2}
+        </select>
+        ${alertaSilo2}
+      </td>
+      <td><input type="number" value="${f.kg2||''}" onchange="updT(${i},'kg2',this.value);actualizarSilos();renderTraslado()" style="width:70px" ${!f.silo2?'disabled style="width:70px;background:#f4f4f4"':'style="width:70px"'}/></td>
+      <td>
+        <input value="${f.cp||''}" placeholder="00001-..." onchange="updT(${i},'cp',this.value)" style="width:95px"/>
         <label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF Carta de Porte">
           <input type="file" accept=".pdf" style="display:none" onchange="subirPDFTraslado(this,${i})"/>PDF
         </label>
         ${pdfData['t'+i]?'<span style="color:#3B6D11;font-size:11px"> ✓</span>':''}
       </td>
-      <td><input value="${f.destino||''}" placeholder="Puerto..." onchange="updT(${i},'destino',this.value)" style="width:135px"/></td>
-      <td><input value="${f.chofer||''}" onchange="updT(${i},'chofer',this.value)" style="width:105px"/></td>
-      <td><input value="${f.contrato||''}" onchange="updT(${i},'contrato',this.value)" style="width:85px"/></td>
-      <td><input value="${f.transporte||''}" onchange="updT(${i},'transporte',this.value)" style="width:105px"/></td>
+      <td><input value="${f.destino||''}" placeholder="Puerto..." onchange="updT(${i},'destino',this.value)" style="width:125px"/></td>
+      <td><input value="${f.chofer||''}" onchange="updT(${i},'chofer',this.value)" style="width:95px"/></td>
+      <td><input value="${f.contrato||''}" onchange="updT(${i},'contrato',this.value)" style="width:80px"/></td>
+      <td><input value="${f.transporte||''}" onchange="updT(${i},'transporte',this.value)" style="width:95px"/></td>
       <td style="text-align:center">${finnCell}</td>
       <td><button onclick="remT(${i})" style="background:none;border:none;color:#E24B4A;cursor:pointer;font-size:14px">✕</button></td>
     `;
@@ -1756,6 +1782,7 @@ async function guardarTraslado(){
       campo,cultivo,campania:camp,tecnico:usuario,
       asiento:asientoTraslado,
       fecha:f.fecha||'',silo:f.silo||'',kg:f.kg||0,
+      silo2:f.silo2||'',kg2:f.kg2||0,
       cp:f.cp||'',destino:f.destino||'',
       chofer:f.chofer||'',contrato:f.contrato||'',transporte:f.transporte||''
     });
