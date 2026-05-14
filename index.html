@@ -259,7 +259,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
         </div>
         <div class="field">
           <label>Campaña</label>
-          <select id="c-campania" onchange="cambiarJornada()"><option>24/25</option><option>25/26</option><option>26/27</option></select>
+          <select id="c-campania" onchange="cambiarJornada()"><option>25/26</option><option>26/27</option></select>
         </div>
         <div class="field">
           <label>Fecha</label>
@@ -349,7 +349,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
         </div>
         <div class="field">
           <label>Campaña</label>
-          <select id="t-campania"><option>24/25</option><option>25/26</option><option>26/27</option></select>
+          <select id="t-campania"><option>25/26</option><option>26/27</option></select>
         </div>
         <div class="field">
           <label>Fecha</label>
@@ -1205,35 +1205,40 @@ async function renderReporteTraslados() {
       porAsiento[as].push(f);
     });
 
-    let html = '';
     let totalKg = 0, totalCPs = 0;
 
-    Object.keys(porAsiento).sort().forEach(asiento => {
+    // Una sola tabla con columna Asiento
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:#534AB7;color:#fff;position:sticky;top:0">
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Asiento</th>
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Fecha</th>
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Carta de Porte</th>
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Silo</th>
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Kg</th>
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Destino</th>
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Chofer</th>
+          <th style="padding:7px 10px;text-align:center;font-weight:600">Transportista</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    let rowCount = 0;
+    Object.keys(porAsiento).sort((a,b) => {
+      if(a === '(pendiente)') return 1;
+      if(b === '(pendiente)') return -1;
+      return parseInt(a) - parseInt(b);
+    }).forEach(asiento => {
       const filas = porAsiento[asiento];
       const esPendiente = asiento === '(pendiente)';
-      html += `<div style="margin-bottom:14px">
-        <div style="font-size:11px;font-weight:700;color:${esPendiente ? '#E65100' : '#534AB7'};margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">
-          ${esPendiente ? '⏳ Pendiente de guardar' : 'Asiento #' + asiento}
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead>
-            <tr style="background:#534AB7;color:#fff">
-              <th style="padding:7px 10px;text-align:center;font-weight:600;font-size:12px">Fecha</th>
-              <th style="padding:7px 10px;text-align:center;font-weight:600;font-size:12px">Carta de Porte</th>
-              <th style="padding:7px 10px;text-align:center;font-weight:600;font-size:12px">Silo</th>
-              <th style="padding:7px 10px;text-align:center;font-weight:600;font-size:12px">Kg</th>
-              <th style="padding:7px 10px;text-align:center;font-weight:600;font-size:12px">Destino</th>
-              <th style="padding:7px 10px;text-align:center;font-weight:600;font-size:12px">Chofer</th>
-              <th style="padding:7px 10px;text-align:center;font-weight:600;font-size:12px">Transportista</th>
-            </tr>
-          </thead>
-          <tbody>`;
+      const asientoLabel = esPendiente ? '⏳' : '#' + String(parseInt(asiento)||asiento).padStart(3,'0');
 
-      filas.forEach((f, idx) => {
+      filas.forEach(f => {
         const kg = parseFloat(f['Kg']) || 0;
         totalKg += kg;
         totalCPs++;
-        const bg = esPendiente ? '#FFF8E1' : (idx % 2 === 0 ? '#fff' : '#f0f0ff');
+        const bg = esPendiente ? '#FFF8E1' : (rowCount % 2 === 0 ? '#fff' : '#f0f0ff');
+        rowCount++;
         const fecha = f['Fecha'] ? String(f['Fecha']).split('T')[0] : '';
         const cp = f['Carta de Porte'] || '';
         const silo = f['Silo de origen'] || '';
@@ -1241,6 +1246,7 @@ async function renderReporteTraslados() {
         const chofer = f['Chofer'] || '';
         const transportista = f['Transportista'] || '';
         html += `<tr style="background:${bg};border-bottom:1px solid #eee">
+          <td style="padding:6px 10px;text-align:center;font-weight:700;color:${esPendiente?'#E65100':'#534AB7'}">${asientoLabel}</td>
           <td style="padding:6px 10px;text-align:center">${fecha}</td>
           <td style="padding:6px 10px;text-align:center;font-weight:700;color:#534AB7">${cp}</td>
           <td style="padding:6px 10px;text-align:center">${silo}</td>
@@ -1250,9 +1256,9 @@ async function renderReporteTraslados() {
           <td style="padding:6px 10px;text-align:center">${transportista}</td>
         </tr>`;
       });
-
-      html += '</tbody></table></div>';
     });
+
+    html += '</tbody></table>';
 
     body.innerHTML = html;
     total.textContent = `Total: ${totalCPs} cartas de porte — ${totalKg.toLocaleString('es-AR')} kg`;
