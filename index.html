@@ -897,6 +897,34 @@ function cargarLocal(){
 }
 
 // ── GOOGLE SHEETS ──
+
+// Sincroniza los valores actuales de los inputs de la tabla con filasCosecha
+// antes de guardar, por si el usuario no hizo tab/click afuera
+function sincronizarInputs(){
+  const tbody = document.getElementById('tbody-cosecha');
+  if(!tbody) return;
+  const filas = tbody.querySelectorAll('tr');
+  filas.forEach((tr, i) => {
+    if(i >= filasCosecha.length) return;
+    const inputs = tr.querySelectorAll('input[type="number"], input:not([type])');
+    inputs.forEach(input => {
+      // Identificar qué campo es por el onchange
+      const oc = input.getAttribute('onchange') || '';
+      if(oc.includes("'kgH'"))  filasCosecha[i].kgH  = input.value;
+      if(oc.includes("'kgS'"))  filasCosecha[i].kgS  = input.value;
+      if(oc.includes("'hum'"))  filasCosecha[i].hum  = input.value;
+      if(oc.includes("'has'"))  filasCosecha[i].has  = input.value;
+      if(oc.includes("'lote'")) filasCosecha[i].lote = input.value;
+      if(oc.includes("'contrato'"))    filasCosecha[i].contrato    = input.value;
+      if(oc.includes("'variedad'"))    filasCosecha[i].variedad    = input.value;
+      if(oc.includes("'chofer'"))      filasCosecha[i].chofer      = input.value;
+      if(oc.includes("'embolso'"))     filasCosecha[i].embolso     = input.value;
+      if(oc.includes("'contratista'")) filasCosecha[i].contratista = input.value;
+      if(oc.includes("'cpSilo'"))      filasCosecha[i].cpSilo      = input.value;
+    });
+  });
+}
+
 async function guardarCosecha(){
   const zona = document.getElementById('c-zona').value;
   const campo = document.getElementById('c-campo').value;
@@ -905,6 +933,7 @@ async function guardarCosecha(){
   if(!zona){ showToast('⚠️ Seleccioná una Zona antes de guardar'); return; }
   if(!campo){ showToast('⚠️ Seleccioná un Establecimiento antes de guardar'); return; }
   if(!cultivo){ showToast('⚠️ Seleccioná un Cultivo antes de guardar'); return; }
+  sincronizarInputs(); // leer valores actuales de pantalla antes de guardar
   guardarLocal();
   const est = document.getElementById('estado-cosecha');
 
