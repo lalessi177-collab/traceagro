@@ -321,7 +321,6 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
       <div class="actions-bar">
         <button class="btn btn-green" onclick="guardarCosecha()">💾 Guardar en Sheets</button>
         <button class="btn btn-sm" style="background:#3B6D11;color:#fff" onclick="toggleReporteCosecha()">📋 Reporte</button>
-        <button class="btn btn-blue btn-sm" onclick="exportarExcelCosecha()">⬇ Descargar Excel</button>
         <button class="btn btn-sm" style="background:#f0f0f0;color:#555;border:1px solid #ddd" onclick="nuevaJornada()">🌅 Nueva jornada</button>
         <span id="estado-cosecha" style="font-size:12px;color:#888"></span>
       </div>
@@ -332,6 +331,7 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
           <span style="font-weight:700;font-size:14px">📋 Reporte de Cosecha</span>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="reporte-cosecha-filtro" style="font-size:11px;opacity:0.85"></span>
+            <button onclick="exportarExcelCosecha()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600">⬇ Excel</button>
             <button onclick="imprimirReporteCosecha()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600">🖨️ Imprimir</button>
             <button onclick="toggleReporteCosecha()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:3px 10px;font-size:13px">✕</button>
           </div>
@@ -417,9 +417,8 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
 
       <div class="actions-bar">
         <button class="btn btn-blue" onclick="guardarTraslado()">💾 Guardar en Sheets</button>
-        <button id="btn-enviar-finn" class="btn btn-sm" style="background:#2E7D32;color:#fff" onclick="enviarTodoAFinnegans()">🚀 Enviar a Finnegans</button>
         <button class="btn btn-sm" style="background:#534AB7;color:#fff" onclick="toggleReporteTraslados()">📋 Reporte</button>
-        <button class="btn btn-sm btn-gray" onclick="exportarExcelTraslado()">⬇ Descargar Excel</button>
+        <button id="btn-enviar-finn" class="btn btn-sm" style="background:#2E7D32;color:#fff" onclick="enviarTodoAFinnegans()">🚀 Enviar a Finnegans</button>
         <span id="estado-traslado" style="font-size:12px;color:#888"></span>
       </div>
 
@@ -429,10 +428,12 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
           <span style="font-weight:700;font-size:14px">📋 Historial de Traslados</span>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="reporte-filtro-info" style="font-size:11px;opacity:0.85"></span>
+            <button onclick="exportarExcelTraslado()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600">⬇ Excel</button>
             <button onclick="imprimirReporteTraslados()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600">🖨️ Imprimir</button>
             <button onclick="toggleReporteTraslados()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:3px 10px;font-size:13px">✕</button>
           </div>
         </div>
+        <div id="reporte-traslados-totales" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#e0e0e0;border-bottom:2px solid #534AB7"></div>
         <div id="reporte-traslados-body" style="padding:14px 18px;max-height:380px;overflow-y:auto">
           <div style="text-align:center;color:#aaa;padding:20px">Cargando...</div>
         </div>
@@ -829,6 +830,16 @@ function seleccionarSilo(i, val){
 }
 
 
+// ── HELPER FECHA ──
+function formatFecha(f) {
+  if (!f) return '';
+  const s = String(f).split('T')[0]; // quitar hora si viene
+  if (s.includes('/')) return s; // ya formateada
+  const parts = s.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return s;
+}
+
 // ── TABLAS DE HUMEDAD ──
 const TABLAS_HUMEDAD = {
   'Trigo':   {14.1:0.69,14.2:0.81,14.3:0.92,14.4:1.04,14.5:1.16,14.6:1.27,14.7:1.39,14.8:1.5,14.9:1.62,15.0:1.73,15.1:1.85,15.2:1.97,15.3:2.08,15.4:2.2,15.5:2.31,15.6:2.43,15.7:2.54,15.8:2.66,15.9:2.77,16.0:2.89,16.1:3.01,16.2:3.12,16.3:3.24,16.4:3.35,16.5:3.47,16.6:3.58,16.7:3.7,16.8:3.81,16.9:3.93,17.0:4.05,17.1:4.16,17.2:4.28,17.3:4.39,17.4:4.51,17.5:4.62,17.6:4.74,17.7:4.86,17.8:4.97,17.9:5.09,18.0:5.2,18.1:5.32,18.2:5.43,18.3:5.55,18.4:5.66,18.5:5.78,18.6:5.9,18.7:6.01,18.8:6.13,18.9:6.24,19.0:6.36,19.1:6.47,19.2:6.59,19.3:6.7,19.4:6.82,19.5:6.94,19.6:7.05,19.7:7.17,19.8:7.29,19.9:7.4,20.0:7.51,20.1:7.63,20.2:7.75,20.3:7.86,20.4:7.98,20.5:8.09,20.6:8.21,20.7:8.32,20.8:8.44,20.9:8.55,21.0:8.67,21.1:8.79,21.2:8.9,21.3:9.02,21.4:9.13,21.5:9.25,21.6:9.36,21.7:9.48,21.8:9.6,21.9:9.71,22.0:9.83,22.1:9.94,22.2:10.05,22.3:10.17,22.4:10.29,22.5:10.4,22.6:10.52,22.7:10.64,22.8:10.75,22.9:10.87,23.0:10.98,23.1:11.1,23.2:11.21,23.3:11.33,23.4:11.44,23.5:11.56,23.6:11.68,23.7:11.79,23.8:11.91,23.9:12.02,24.0:12.14,24.1:12.25,24.2:12.37,24.3:12.48,24.4:12.6,24.5:12.72,24.6:12.83,24.7:12.95,24.8:13.06,24.9:13.18,25.0:13.29},
@@ -1222,7 +1233,7 @@ async function renderReporteCosecha() {
       const asiento = esPendiente ? '⏳' : '#' + String(parseInt(f['Asiento'])||f['Asiento']).padStart(3,'0');
       const bg = esPendiente ? '#FFF8E1' : (rowCount % 2 === 0 ? '#fff' : '#f0fff4');
       rowCount++;
-      const fecha = f['Fecha'] ? String(f['Fecha']).split('T')[0] : '';
+      const fecha = formatFecha(f['Fecha']);
       const kgH = parseFloat(f['Kg Húmedos']) || 0;
       const kgS = parseFloat(f['Kg Secos']) || 0;
       const destino = f['Destino tipo'] || '';
@@ -1382,8 +1393,26 @@ async function renderReporteTraslados() {
     if (!todas.length) {
       body.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px">No hay traslados registrados para este filtro.</div>';
       total.textContent = '';
+      totDiv.innerHTML = '';
       return;
     }
+
+    // Calcular totales traslados
+    let totKgT = 0, totCPsT = 0;
+    todas.forEach(f => {
+      totKgT += parseFloat(f['Kg']) || 0;
+      totCPsT++;
+    });
+    const totalesT = [
+      { label: 'Cartas de Porte', val: String(totCPsT), color: '#534AB7' },
+      { label: 'Kg Trasladados',  val: totKgT.toLocaleString('es-AR'), color: '#1565C0' },
+      { label: 'Silo Principal',  val: [...new Set(todas.map(f=>f['Silo de origen']).filter(Boolean))].join(', ') || '—', color: '#3B6D11' },
+    ];
+    totDiv.innerHTML = totalesT.map(t => `
+      <div style="background:#fff;padding:10px 14px;text-align:center">
+        <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase">${t.label}</div>
+        <div style="font-size:16px;font-weight:700;color:${t.color}">${t.val}</div>
+      </div>`).join('');
 
     // Agrupar por asiento
     const porAsiento = {};
@@ -1427,7 +1456,7 @@ async function renderReporteTraslados() {
         totalCPs++;
         const bg = esPendiente ? '#FFF8E1' : (rowCount % 2 === 0 ? '#fff' : '#f0f0ff');
         rowCount++;
-        const fecha = f['Fecha'] ? String(f['Fecha']).split('T')[0] : '';
+        const fecha = formatFecha(f['Fecha']);
         const cp = f['Carta de Porte'] || '';
         const silo = f['Silo de origen'] || '';
         const destino = f['Destino'] || '';
