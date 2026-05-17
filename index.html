@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>TraceAgro Sync v2.4</title>
+<title>TraceAgro Sync v2.2-DEV</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#3B6D11"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -320,9 +320,29 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
 
       <div class="actions-bar">
         <button class="btn btn-green" onclick="guardarCosecha()">💾 Guardar en Sheets</button>
+        <button class="btn btn-sm" style="background:#3B6D11;color:#fff" onclick="toggleReporteCosecha()">📋 Reporte</button>
         <button class="btn btn-blue btn-sm" onclick="exportarExcelCosecha()">⬇ Descargar Excel</button>
         <button class="btn btn-sm" style="background:#f0f0f0;color:#555;border:1px solid #ddd" onclick="nuevaJornada()">🌅 Nueva jornada</button>
         <span id="estado-cosecha" style="font-size:12px;color:#888"></span>
+      </div>
+
+      <!-- REPORTE COSECHA -->
+      <div id="reporte-cosecha-wrap" style="display:none;background:#fff;border:1px solid #ddd;border-radius:10px;margin-top:12px;overflow:hidden">
+        <div style="background:#3B6D11;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:700;font-size:14px">📋 Reporte de Cosecha</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="reporte-cosecha-filtro" style="font-size:11px;opacity:0.85"></span>
+            <button onclick="imprimirReporteCosecha()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600">🖨️ Imprimir</button>
+            <button onclick="toggleReporteCosecha()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;border-radius:6px;padding:3px 10px;font-size:13px">✕</button>
+          </div>
+        </div>
+        <div id="reporte-cosecha-totales" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e0e0e0;border-bottom:2px solid #3B6D11"></div>
+        <div id="reporte-cosecha-body" style="padding:14px 18px;max-height:420px;overflow-y:auto">
+          <div style="text-align:center;color:#aaa;padding:20px">Cargando...</div>
+        </div>
+        <div style="padding:10px 18px;background:#f8f8f8;border-top:1px solid #eee;font-size:11px;color:#555;font-weight:600">
+          <span id="reporte-cosecha-total"></span>
+        </div>
       </div>
     </div>
 
@@ -1097,6 +1117,174 @@ async function cargarCosechaDeSheets(){
   }catch(e){
     console.warn('Sin conexión, usando datos locales');
   }
+}
+
+// ── REPORTE COSECHA ──
+let reporteCosechaVisible = false;
+
+function toggleReporteCosecha() {
+  const wrap = document.getElementById('reporte-cosecha-wrap');
+  reporteCosechaVisible = !reporteCosechaVisible;
+  wrap.style.display = reporteCosechaVisible ? 'block' : 'none';
+  if (reporteCosechaVisible) renderReporteCosecha();
+}
+
+async function renderReporteCosecha() {
+  const campo   = document.getElementById('c-campo').value;
+  const cultivo = document.getElementById('c-cultivo').value;
+  const camp    = document.getElementById('c-campania').value;
+  const body    = document.getElementById('reporte-cosecha-body');
+  const totDiv  = document.getElementById('reporte-cosecha-totales');
+  const totalEl = document.getElementById('reporte-cosecha-total');
+  const filtro  = document.getElementById('reporte-cosecha-filtro');
+
+  filtro.textContent = `${campo} / ${cultivo} / ${camp}`;
+  body.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px">Cargando desde Sheets...</div>';
+  totDiv.innerHTML = '';
+
+  try {
+    const params = new URLSearchParams({
+      ssId: userSSId, action: 'read_cosecha',
+      campo, cultivo, campania: camp
+    });
+    const resp = await fetch(SHEETS_URL + '?' + params.toString());
+    const data = await resp.json();
+
+    const filasBD = data.filas || [];
+
+    // Filas locales no guardadas aún
+    const cpsBD = new Set(filasBD.map(f => String(f['CP / Silo / Destino']).trim()));
+    const filasLocales = filasCosecha
+      .filter(f => f.kgH && !cpsBD.has(f.cpSilo || ''))
+      .map(f => ({
+        'Asiento':            '(pendiente)',
+        'Fecha':              f.fecha || '',
+        'Lote':               f.lote || '',
+        'Has':                f.has || '',
+        'Kg Húmedos':         f.kgH || 0,
+        'Humedad %':          f.hum || '',
+        'Kg Secos':           f.kgS || 0,
+        'Destino tipo':       f.destino || '',
+        'CP / Silo / Destino': f.cpSilo || '',
+        _pendiente: true
+      }));
+
+    const todas = [...filasBD, ...filasLocales];
+
+    if (!todas.length) {
+      body.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px">No hay datos de cosecha para este filtro.</div>';
+      totalEl.textContent = '';
+      totDiv.innerHTML = '';
+      return;
+    }
+
+    // Calcular totales
+    let totHas = 0, totKgH = 0, totKgS = 0;
+    todas.forEach(f => {
+      totHas += parseFloat(f['Has']) || 0;
+      totKgH += parseFloat(f['Kg Húmedos']) || 0;
+      totKgS += parseFloat(f['Kg Secos']) || 0;
+    });
+    const rinde = totHas > 0 ? Math.round(totKgS / totHas) : 0;
+
+    // Tarjetas de totales
+    const totales = [
+      { label: 'Has Cosechadas', val: totHas.toLocaleString('es-AR'), color: '#3B6D11' },
+      { label: 'Kg Húmedos',     val: totKgH.toLocaleString('es-AR'), color: '#1565C0' },
+      { label: 'Kg Secos',       val: totKgS.toLocaleString('es-AR'), color: '#534AB7' },
+      { label: 'Rinde Seco',     val: rinde.toLocaleString('es-AR') + ' kg/ha', color: '#E65100' },
+    ];
+    totDiv.innerHTML = totales.map(t => `
+      <div style="background:#fff;padding:10px 14px;text-align:center">
+        <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase">${t.label}</div>
+        <div style="font-size:16px;font-weight:700;color:${t.color}">${t.val}</div>
+      </div>`).join('');
+
+    // Tabla
+    let rowCount = 0;
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:#3B6D11;color:#fff;position:sticky;top:0">
+          <th style="padding:7px 8px;text-align:center">Asiento</th>
+          <th style="padding:7px 8px;text-align:center">Fecha</th>
+          <th style="padding:7px 8px;text-align:center">Lote</th>
+          <th style="padding:7px 8px;text-align:center">Has</th>
+          <th style="padding:7px 8px;text-align:center">Kg Húmedos</th>
+          <th style="padding:7px 8px;text-align:center">Hum%</th>
+          <th style="padding:7px 8px;text-align:center">Kg Secos</th>
+          <th style="padding:7px 8px;text-align:center">Destino</th>
+          <th style="padding:7px 8px;text-align:center">Silo / CP</th>
+        </tr>
+      </thead><tbody>`;
+
+    todas.forEach(f => {
+      const esPendiente = f['Asiento'] === '(pendiente)' || f._pendiente;
+      const asiento = esPendiente ? '⏳' : '#' + String(parseInt(f['Asiento'])||f['Asiento']).padStart(3,'0');
+      const bg = esPendiente ? '#FFF8E1' : (rowCount % 2 === 0 ? '#fff' : '#f0fff4');
+      rowCount++;
+      const fecha = f['Fecha'] ? String(f['Fecha']).split('T')[0] : '';
+      const kgH = parseFloat(f['Kg Húmedos']) || 0;
+      const kgS = parseFloat(f['Kg Secos']) || 0;
+      const destino = f['Destino tipo'] || '';
+      const destinoBadge = destino === 'cam' ? '🚛 Camión' : destino === 'silo' ? '🌾 Silo' : destino === 'mov' ? '🔄 Mov Int' : destino;
+      html += `<tr style="background:${bg};border-bottom:1px solid #eee">
+        <td style="padding:6px 8px;text-align:center;font-weight:700;color:${esPendiente?'#E65100':'#3B6D11'}">${asiento}</td>
+        <td style="padding:6px 8px;text-align:center">${fecha}</td>
+        <td style="padding:6px 8px;text-align:center">${f['Lote']||''}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:600">${f['Has']?parseFloat(f['Has']).toLocaleString('es-AR'):''}</td>
+        <td style="padding:6px 8px;text-align:center">${kgH?kgH.toLocaleString('es-AR'):''}</td>
+        <td style="padding:6px 8px;text-align:center">${f['Humedad %']||''}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:600;color:#534AB7">${kgS?kgS.toLocaleString('es-AR'):''}</td>
+        <td style="padding:6px 8px;text-align:center">${destinoBadge}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:600;color:#3B6D11">${f['CP / Silo / Destino']||''}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    body.innerHTML = html;
+    totalEl.textContent = `Total: ${todas.length} registros — ${totKgH.toLocaleString('es-AR')} kg húmedos — ${totKgS.toLocaleString('es-AR')} kg secos`;
+
+  } catch(e) {
+    body.innerHTML = `<div style="color:#E24B4A;padding:12px">Error al cargar el reporte: ${e.message}</div>`;
+    console.error(e);
+  }
+}
+
+function imprimirReporteCosecha() {
+  const campo   = document.getElementById('c-campo').value;
+  const cultivo = document.getElementById('c-cultivo').value;
+  const camp    = document.getElementById('c-campania').value;
+  const body    = document.getElementById('reporte-cosecha-body').innerHTML;
+  const totales = document.getElementById('reporte-cosecha-totales').innerHTML;
+  const total   = document.getElementById('reporte-cosecha-total').textContent;
+  const fecha   = new Date().toLocaleDateString('es-AR');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+    <title>Reporte Cosecha — ${campo} / ${cultivo} / ${camp}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:20px}
+      h2{color:#3B6D11;margin-bottom:4px}
+      .subtitulo{color:#888;font-size:11px;margin-bottom:12px}
+      .totales{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+      .tot-card{background:#f4f8f4;border:1px solid #ddd;border-radius:6px;padding:8px;text-align:center}
+      .tot-label{font-size:10px;color:#888;text-transform:uppercase;font-weight:600}
+      .tot-val{font-size:15px;font-weight:700;color:#3B6D11}
+      table{width:100%;border-collapse:collapse;margin-bottom:12px}
+      th{background:#3B6D11;color:#fff;padding:6px 8px;text-align:center;font-size:11px}
+      td{padding:5px 8px;text-align:center;border-bottom:1px solid #eee;font-size:11px}
+      tr:nth-child(even){background:#f0fff4}
+      .total{font-size:11px;color:#555;border-top:2px solid #3B6D11;padding-top:8px;margin-top:8px}
+      @media print{body{padding:10px}}
+    </style></head><body>
+    <h2>📋 Reporte de Cosecha</h2>
+    <div class="subtitulo">${campo} / ${cultivo} / Campaña ${camp} — Impreso el ${fecha}</div>
+    <div class="totales">${totales}</div>
+    ${body}
+    <div class="total">${total}</div>
+    <script>window.onload=function(){window.print()}<\/script>
+    </body></html>`);
+  win.document.close();
 }
 
 // ── REPORTE TRASLADOS ──
