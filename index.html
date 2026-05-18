@@ -2014,7 +2014,8 @@ async function guardarTraslado(){
   cargarStockSilos();
 
   // Enviar mail automáticamente (siempre que haya CPs cargadas)
-  enviarMailCPsTraslado(campo, cultivo, camp, asientoTraslado, fecha);
+  const fechaHoy = new Date().toLocaleDateString('es-AR');
+  enviarMailCPsTraslado(campo, cultivo, camp, asientoTraslado, fechaHoy);
 }
 
 // ── ENVÍO MAIL CPs ──
