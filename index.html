@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>TraceAgro Sync v2.2-DEV</title>
+<title>TraceAgro Sync v2.5</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#3B6D11"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1576,7 +1576,7 @@ function renderTraslado(){
       finnCell = `<span style="background:#C6EFCE;color:#27500A;font-size:11px;font-weight:700;padding:3px 8px;border-radius:12px;white-space:nowrap">✓ #${f.finnAsiento}</span>`;
     } else if(f._finnegans || f.cp){
       // Tiene datos pero aún no fue enviada — botón enviar
-      finnCell = `<button onclick="verPrevistaFinnegans(${i})" style="background:#1565C0;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">📋 Ver y enviar</button>`;
+      finnCell = `<button onclick="verPrevistaFinnegans(${i})" style="background:#1565C0;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">📋 Ver</button>`;
     } else {
       // Sin CP cargada — no puede enviarse
       finnCell = `<span style="color:#bbb;font-size:11px">Sin CP</span>`;
