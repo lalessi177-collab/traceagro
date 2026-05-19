@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>TraceAgro Sync v2.2-DEV</title>
+<title>TraceAgro Sync v2.5</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#3B6D11"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2029,37 +2029,25 @@ async function enviarMailCPsTraslado(campo, cultivo, camp, asiento, fecha) {
         kg:      f.kg,
         destino: f.destino || '-'
       }));
-
     if (!cps.length) return;
-
-    // Mandar solo los datos del resumen (sin PDFs en base64 para no superar el límite de URL)
-    // Los PDFs se adjuntan desde Drive en el Apps Script
     const params = new URLSearchParams({
-      ssId:     userSSId,
-      action:   'enviar_mail_cps',
-      campo, cultivo,
-      campania: camp,
-      tecnico:  usuario,
+      ssId: userSSId,
+      action: 'enviar_mail_cps',
+      campo, cultivo, campania: camp,
+      tecnico: usuario,
       asiento,
-      fecha:    fecha || new Date().toLocaleDateString('es-AR'),
-      resumen:  JSON.stringify(cps)
+      fecha,
+      resumen: JSON.stringify(cps)
     });
-
-    console.log('Enviando mail - params:', params.toString().substring(0, 200));
-    showToast('📧 Enviando mail...', 3000);
     const resp = await fetch(SHEETS_URL + '?' + params.toString());
-    const text = await resp.text();
-    console.log('Respuesta mail:', text);
-    const data = JSON.parse(text);
-
+    const data = await resp.json();
     if (data.ok) {
-      showToast('✓ Mail enviado a ' + data.mail, 4000);
+      showToast('📧 Mail enviado correctamente', 3000);
     } else {
-      console.warn('Error mail:', data.error);
-      showToast('⚠️ Mail: ' + (data.error || 'error desconocido'), 4000);
+      showToast('⚠️ Mail: ' + (data.error || 'error desconocido'), 5000);
     }
   } catch(e) {
-    console.warn('Error mail:', e.message);
+    console.warn('Error enviando mail:', e);
   }
 }
 
