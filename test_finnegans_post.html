@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test POST Finnegans — CPE Marmetto</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #F0F4F8; color: #1a2332; min-height: 100vh; }
+
+  header { background: #1565C0; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 16px; font-weight: 700; }
+  header .sub { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+  .badge { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.35); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; margin-left: auto; }
+
+  .container { max-width: 900px; margin: 24px auto; padding: 0 16px 40px; }
+
+  .card { background: #fff; border-radius: 12px; border: 1px solid #dde3ec; margin-bottom: 16px; overflow: hidden; }
+  .card-header { padding: 12px 16px; border-bottom: 1px solid #eef1f6; display: flex; align-items: center; gap: 8px; }
+  .card-header h2 { font-size: 13px; font-weight: 700; color: #1565C0; }
+  .card-body { padding: 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field label { font-size: 10px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.04em; }
+  .field .val { font-size: 13px; font-weight: 600; color: #1a2332; background: #f4f7fb; padding: 5px 8px; border-radius: 6px; }
+  .field .val.logic { background: #E8F5E9; color: #1b5e20; }
+  .field .val.app   { background: #FFF3E0; color: #e65100; }
+  .field .val.empty { background: #f9f9f9; color: #bbb; font-weight: 400; font-style: italic; }
+
+  .token-box { background: #E3F2FD; border: 1px solid #90CAF9; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: #0D47A1; }
+  .token-box input { width: 100%; border: 1px solid #90CAF9; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-family: monospace; background: #fff; color: #1a2332; margin-top: 6px; }
+
+  .btn { border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #1565C0; color: #fff; }
+  .btn-primary:hover { background: #0D47A1; }
+  .btn-primary:disabled { background: #90CAF9; cursor: not-allowed; }
+  .btn-green { background: #2E7D32; color: #fff; }
+  .btn-green:hover { background: #1b5e20; }
+  .btn-outline { background: transparent; border: 1px solid #1565C0; color: #1565C0; }
+
+  .actions { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+  #log { background: #0D1117; border-radius: 10px; padding: 14px 16px; font-family: monospace; font-size: 12px; color: #c9d1d9; min-height: 80px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; }
+  .log-ok   { color: #56d364; }
+  .log-err  { color: #f85149; }
+  .log-info { color: #79c0ff; }
+  .log-warn { color: #e3b341; }
+
+  #payload-box { background: #0D1117; border-radius: 10px; padding: 14px 16px; font-family: monospace; font-size: 11px; color: #c9d1d9; max-height: 400px; overflow-y: auto; white-space: pre; line-height: 1.5; display: none; }
+
+  #resp-box { padding: 14px 16px; font-family: monospace; font-size: 12px; border-radius: 10px; display: none; white-space: pre-wrap; }
+  #resp-box.ok  { background: #E8F5E9; color: #1b5e20; border: 1px solid #A5D6A7; }
+  #resp-box.err { background: #FFEBEE; color: #b71c1c; border: 1px solid #EF9A9A; }
+
+  .step { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+  .step:last-child { border-bottom: none; }
+  .step-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .step-icon.wait    { background: #E3F2FD; color: #1565C0; }
+  .step-icon.running { background: #FFF3E0; color: #e65100; }
+  .step-icon.ok      { background: #E8F5E9; color: #2E7D32; }
+  .step-icon.err     { background: #FFEBEE; color: #c62828; }
+  .step-label { flex: 1; color: #444; }
+  .step-detail { font-size: 11px; color: #888; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🧪 Test POST Finnegans</h1>
+    <div class="sub">CPE Marmetto · CTG 10130468246 · Girasol · Algimar</div>
+  </div>
+  <span class="badge">Ambiente de prueba</span>
+</header>
+
+<div class="container">
+
+  <!-- TOKEN -->
+  <div class="token-box">
+    <strong>ACCESS TOKEN</strong> — podés cambiarlo si tenés uno diferente
+    <input type="text" id="access-token" value="3cbf2cc0-17af-4e6d-affb-858e889edc0f">
+  </div>
+
+  <!-- DATOS DE LA CP -->
+  <div class="card">
+    <div class="card-header"><h2>📄 Datos de la CPE — Marmetto</h2></div>
+    <div class="card-body">
+      <div class="grid" style="margin-bottom:10px">
+        <div class="field"><label>N° CPE</label><div class="val">00001-00010505</div></div>
+        <div class="field"><label>CTG</label><div class="val">10130468246</div></div>
+        <div class="field"><label>Fecha</label><div class="val">2026-03-25</div></div>
+        <div class="field"><label>Grano</label><div class="val">Girasol</div></div>
+        <div class="field"><label>Campaña</label><div class="val app">2526 (filtro TraceAgro)</div></div>
+        <div class="field"><label>Tipo CPE</label><div class="val logic">1 (Automotor)</div></div>
+        <div class="field"><label>Peso Neto (kg)</label><div class="val">29.000</div></div>
+        <div class="field"><label>Peso Tara (kg)</label><div class="val logic">15.000 (fijo)</div></div>
+        <div class="field"><label>Peso Bruto (kg)</label><div class="val logic">44.000 (calculado)</div></div>
+        <div class="field"><label>Patente</label><div class="val">EQC942</div></div>
+        <div class="field"><label>Patente Acoplado</label><div class="val">UDP663</div></div>
+        <div class="field"><label>Kms</label><div class="val">70</div></div>
+        <div class="field"><label>Tarifa</label><div class="val">18800</div></div>
+        <div class="field"><label>Condición Flete</label><div class="val logic">PAGADO (flete pagador = Bunge)</div></div>
+        <div class="field"><label>Tarifario</label><div class="val logic">prue</div></div>
+        <div class="field"><label>Turno</label><div class="val">QQGICOM260326000778</div></div>
+        <div class="field"><label>Localidad Origen</label><div class="val">General Alvarado → 6355</div></div>
+        <div class="field"><label>Provincia Origen</label><div class="val logic">1 (Buenos Aires)</div></div>
+        <div class="field"><label>Depósito Origen</label><div class="val logic">ESE (zona Sudeste)</div></div>
+      </div>
+      <div class="grid">
+        <div class="field"><label>Solicitante CUIT</label><div class="val">30-50930520-6 (Estanar)</div></div>
+        <div class="field"><label>Entregador CUIT</label><div class="val">30-52673056-5 (Amato y Catalano)</div></div>
+        <div class="field"><label>Destinatario CUIT</label><div class="val">30-70086991-8 (Bunge)</div></div>
+        <div class="field"><label>Transportista CUIT</label><div class="val">27-20586874-2 (Carabajal)</div></div>
+        <div class="field"><label>Chofer CUIT</label><div class="val">20-22531460-9 (Marmetto)</div></div>
+        <div class="field"><label>Flete Pagador CUIT</label><div class="val">30-70086991-8 (Bunge)</div></div>
+        <div class="field"><label>Centro de Costo</label><div class="val app">Algimar-GIRASOL-2526</div></div>
+        <div class="field"><label>Observaciones</label><div class="val app">Algimar · Carabajal Marta Liliana</div></div>
+        <div class="field"><label>Depósito Destino</label><div class="val logic">depcligr</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASOS -->
+  <div class="card">
+    <div class="card-header"><h2>⚙️ Pasos de ejecución</h2></div>
+    <div class="card-body" id="steps">
+      <div class="step" id="step-1">
+        <div class="step-icon wait" id="icon-1">1</div>
+        <div class="step-label">GET organizaciones por CUIT</div>
+        <div class="step-detail" id="det-1">esperando...</div>
+      </div>
+      <div class="step" id="step-2">
+        <div class="step-icon wait" id="icon-2">2</div>
+        <div class="step-label">GET localidades</div>
+        <div class="step-detail" id="det-2">esperando...</div>
+      </div>
+      <div class="step" id="step-3">
+        <div class="step-icon wait" id="icon-3">3</div>
+        <div class="step-label">Resolver códigos internos Finnegans</div>
+        <div class="step-detail" id="det-3">esperando...</div>
+      </div>
+      <div class="step" id="step-4">
+        <div class="step-icon wait" id="icon-4">4</div>
+        <div class="step-label">POST /APITrasladosGranos</div>
+        <div class="step-detail" id="det-4">esperando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACCIONES -->
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-run" onclick="ejecutar()">▶ Ejecutar GET + POST</button>
+    <button class="btn btn-outline" onclick="soloPayload()">👁 Solo ver payload (sin POST)</button>
+    <button class="btn btn-outline" onclick="limpiar()">🗑 Limpiar</button>
+  </div>
+
+  <!-- LOG -->
+  <div class="card">
+    <div class="card-header"><h2>📋 Log de ejecución</h2></div>
+    <div class="card-body" style="padding:0">
+      <div id="log">Presioná "Ejecutar" para arrancar...\n</div>
+    </div>
+  </div>
+
+  <!-- PAYLOAD -->
+  <div class="card" id="payload-card" style="display:none">
+    <div class="card-header"><h2>📦 Payload enviado a Finnegans</h2></div>
+    <div class="card-body" style="padding:0">
+      <div id="payload-box"></div>
+    </div>
+  </div>
+
+  <!-- RESPUESTA -->
+  <div class="card" id="resp-card" style="display:none">
+    <div class="card-header"><h2>📥 Respuesta de Finnegans</h2></div>
+    <div class="card-body" style="padding:0">
+      <div id="resp-box"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const FINN_BASE = 'https://api.finneg.com/api';
+
+// Datos fijos de la CPE Marmetto
+const CPE = {
+  nroCPE:      '00001-00010505',
+  ctg:         '10130468246',
+  fecha:       '2026-03-25',
+  turno:       'QQGICOM260326000778',
+  grano:       'Girasol',
+  especieID:   '02',
+  campania:    'C2526',
+  pesoNeto:    29000,
+  pesoTara:    15000,
+  pesoBruto:   44000,
+  patente:     'EQC942',
+  patenteAcop: 'UDP663',
+  kms:         70,
+  tarifa:      18800,
+  localidadOrigenID: 6355,
+  provinciaOrigenID: 1,
+  provinciaDestinoID: 1,
+  depositoOrigen: 'ESE',
+  depositoDestino: 'depcligr',
+  tarifario:   'prue',
+  tipoCPE:     1,
+  centroCosto: 'Algimar-GIRASOL-2526',
+  observaciones: 'Algimar · Carabajal Marta Liliana',
+  // CUITs de intervinientes
+  cuits: {
+    solicitante:  '30509305206',
+    entregador:   '30526730565',
+    destinatario: '30700869918',
+    destino:      '30700869918',
+    transportista:'27205868742',
+    chofer:       '20225314609',
+    fletePagador: '30700869918',
+  }
+};
+
+const logEl = document.getElementById('log');
+
+function log(msg, tipo = '') {
+  const clase = tipo ? `class="${tipo}"` : '';
+  logEl.innerHTML += `<span ${clase}>${msg}</span>\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setStep(n, estado, detalle = '') {
+  const icon = document.getElementById(`icon-${n}`);
+  const det  = document.getElementById(`det-${n}`);
+  icon.className = `step-icon ${estado}`;
+  icon.textContent = estado === 'ok' ? '✓' : estado === 'err' ? '✗' : n;
+  if (detalle) det.textContent = detalle;
+}
+
+function normCUIT(c) { return c ? c.replace(/-/g,'') : ''; }
+
+async function finnGet(endpoint, token) {
+  const r = await fetch(`${FINN_BASE}/${endpoint}?ACCESS_TOKEN=${token}`);
+  if (!r.ok) throw new Error(`GET ${endpoint} → HTTP ${r.status}`);
+  return r.json();
+}
+
+function limpiar() {
+  logEl.innerHTML = 'Log limpiado.\n';
+  document.getElementById('payload-card').style.display = 'none';
+  document.getElementById('resp-card').style.display = 'none';
+  document.getElementById('payload-box').style.display = 'none';
+  document.getElementById('resp-box').style.display = 'none';
+  [1,2,3,4].forEach(n => setStep(n, 'wait', 'esperando...'));
+}
+
+async function soloPayload() {
+  const token = document.getElementById('access-token').value.trim();
+  logEl.innerHTML = '';
+  log('👁 Armando payload sin hacer POST...', 'log-info');
+  try {
+    const payload = await construirPayload(token, false);
+    mostrarPayload(payload);
+  } catch(e) {
+    log('❌ ' + e.message, 'log-err');
+  }
+}
+
+async function construirPayload(token, verbose = true) {
+  // PASO 1: GET organizaciones
+  setStep(1, 'running', 'consultando...');
+  if(verbose) log('📡 GET organizaciones por CUIT...', 'log-info');
+  const orgs = await finnGet('reports/informacionFiscalClientes', token);
+  if(verbose) log(`   → ${orgs.length} organizaciones encontradas`, 'log-ok');
+  setStep(1, 'ok', `${orgs.length} orgs`);
+
+  // PASO 2: GET localidades
+  setStep(2, 'running', 'consultando...');
+  if(verbose) log('📡 GET localidades...', 'log-info');
+  const locs = await finnGet('Localidad/list', token);
+  if(verbose) log(`   → ${locs.length} localidades encontradas`, 'log-ok');
+  setStep(2, 'ok', `${locs.length} localidades`);
+
+  // PASO 3: Resolver códigos
+  setStep(3, 'running', 'resolviendo...');
+  if(verbose) log('🔍 Resolviendo CUITs...', 'log-info');
+
+  function buscarOrg(cuit) {
+    const org = orgs.find(o => normCUIT(o.NUMEROIDENTIFICACIONTRIBUTARIA) === normCUIT(cuit));
+    if (org) {
+      if(verbose) log(`   ✓ CUIT ${cuit} → ORGANIZACIONID ${org.ORGANIZACIONID} (${org.NOMBRE})`, 'log-ok');
+      return org.ORGANIZACIONID;
+    } else {
+      if(verbose) log(`   ⚠ CUIT ${cuit} → no encontrado en Finnegans`, 'log-warn');
+      return null;
+    }
+  }
+
+  const ids = {
+    solicitante:  buscarOrg(CPE.cuits.solicitante),
+    entregador:   buscarOrg(CPE.cuits.entregador),
+    destinatario: buscarOrg(CPE.cuits.destinatario),
+    destino:      buscarOrg(CPE.cuits.destino),
+    transportista:buscarOrg(CPE.cuits.transportista),
+    chofer:       buscarOrg(CPE.cuits.chofer),
+    fletePagador: buscarOrg(CPE.cuits.fletePagador),
+  };
+
+  setStep(3, 'ok', 'códigos resueltos');
+
+  // Armar payload
+  const payload = {
+    TipoCPE:              CPE.tipoCPE,
+    Fecha:                CPE.fecha,
+    NumeroDocumento:      CPE.nroCPE,
+    IdentificacionExterna: CPE.ctg,
+    TurnoNro:             CPE.turno,
+    CampanaID:            CPE.campania,
+    EspecieID:            CPE.especieID,
+    DeclaracionCalidad:   1,
+    PesoNeto:             CPE.pesoNeto,
+    PesoTara:             CPE.pesoTara,
+    PesoBruto:            CPE.pesoBruto,
+    PatenteCamion:        CPE.patente,
+    PatenteAcoplado:      CPE.patenteAcop,
+    Kmrecorrer:           CPE.kms,
+    Tarifa:               CPE.tarifa,
+    CondicionFlete:       'PAGADO',
+    TarifarioID:          CPE.tarifario,
+    Solicitante:          ids.solicitante,
+    Entregador:           ids.entregador,
+    Destinatario:         ids.destinatario,
+    Destino:              ids.destino,
+    Transportista:        ids.transportista,
+    Chofer:               ids.chofer,
+    PagadorFlete:         ids.fletePagador,
+    LocalidadIDOrigenGrano: CPE.localidadOrigenID,
+    ProvinciaIDOrigen:    CPE.provinciaOrigenID,
+    ProvinciaIDDestino:   CPE.provinciaDestinoID,
+    CentroCosto:          CPE.centroCosto,
+    Descripcion:          CPE.observaciones,
+    OperacionItems: [{
+      DepositoIDOrigen:       CPE.depositoOrigen,
+      DepositoIDDestino:      CPE.depositoDestino,
+      DepositoIDPuertoDestino: CPE.depositoDestino,
+      Cantidad:               CPE.pesoNeto
+    }],
+    DepositoOrigenItems: [{
+      DepositoID: CPE.depositoOrigen,
+      Cantidad:   CPE.pesoNeto
+    }]
+  };
+
+  return payload;
+}
+
+function mostrarPayload(payload) {
+  const box = document.getElementById('payload-box');
+  box.textContent = JSON.stringify(payload, null, 2);
+  box.style.display = 'block';
+  document.getElementById('payload-card').style.display = 'block';
+}
+
+async function ejecutar() {
+  const token = document.getElementById('access-token').value.trim();
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  logEl.innerHTML = '';
+  document.getElementById('payload-card').style.display = 'none';
+  document.getElementById('resp-card').style.display = 'none';
+  [1,2,3,4].forEach(n => setStep(n, 'wait', 'esperando...'));
+
+  try {
+    const payload = await construirPayload(token, true);
+    mostrarPayload(payload);
+
+    // PASO 4: POST
+    setStep(4, 'running', 'enviando...');
+    log('\n📤 POST /APITrasladosGranos...', 'log-info');
+    log(JSON.stringify(payload, null, 2), '');
+
+    const resp = await fetch(
+      `${FINN_BASE}/APITrasladosGranos?ACCESS_TOKEN=${token}`,
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload)
+      }
+    );
+
+    const data = await resp.json();
+    log('\n📥 Respuesta Finnegans:', 'log-info');
+    log(JSON.stringify(data, null, 2), resp.ok ? 'log-ok' : 'log-err');
+
+    const respBox = document.getElementById('resp-box');
+    respBox.textContent = JSON.stringify(data, null, 2);
+    respBox.className = resp.ok && !data.error ? 'ok' : 'err';
+    respBox.style.display = 'block';
+    document.getElementById('resp-card').style.display = 'block';
+
+    if (resp.ok && !data.error) {
+      setStep(4, 'ok', `Asiento: ${data.TransaccionID || data.status || 'OK'}`);
+      log(`\n✅ ¡CP enviada exitosamente! Asiento: ${data.TransaccionID || data.status || JSON.stringify(data)}`, 'log-ok');
+    } else {
+      setStep(4, 'err', data.error || `HTTP ${resp.status}`);
+      log(`\n❌ Error: ${data.error || resp.status}`, 'log-err');
+    }
+
+  } catch(e) {
+    log('\n❌ Error: ' + e.message, 'log-err');
+    setStep(4, 'err', e.message);
+  }
+
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
