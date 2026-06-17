@@ -268,46 +268,41 @@ async function soloPayload() {
 }
 
 async function construirPayload(token, verbose = true) {
-  // PASO 1: GET organizaciones
-  setStep(1, 'running', 'consultando...');
-  if(verbose) log('📡 GET organizaciones por CUIT...', 'log-info');
-  const orgs = await finnGet('reports/informacionFiscalClientes', token);
-  if(verbose) log(`   → ${orgs.length} organizaciones encontradas`, 'log-ok');
-  setStep(1, 'ok', `${orgs.length} orgs`);
+  // PASO 1 y 2: Hardcodeados mientras CORS no está habilitado en Finnegans
+  // Estos IDs se obtuvieron del GET informacionFiscalClientes
+  setStep(1, 'ok', 'hardcodeado (CORS pendiente)');
+  setStep(2, 'ok', 'hardcodeado (CORS pendiente)');
+  if(verbose) log('ℹ️ Usando IDs hardcodeados mientras Finnegans habilita CORS', 'log-warn');
 
-  // PASO 2: GET localidades
-  setStep(2, 'running', 'consultando...');
-  if(verbose) log('📡 GET localidades...', 'log-info');
-  const locs = await finnGet('Localidad/list', token);
-  if(verbose) log(`   → ${locs.length} localidades encontradas`, 'log-ok');
-  setStep(2, 'ok', `${locs.length} localidades`);
-
-  // PASO 3: Resolver códigos
+  // PASO 3: IDs ya resueltos de la lista de Finnegans
   setStep(3, 'running', 'resolviendo...');
-  if(verbose) log('🔍 Resolviendo CUITs...', 'log-info');
+  if(verbose) log('🔍 Resolviendo IDs de organizaciones...', 'log-info');
 
-  function buscarOrg(cuit) {
-    const org = orgs.find(o => normCUIT(o.NUMEROIDENTIFICACIONTRIBUTARIA) === normCUIT(cuit));
-    if (org) {
-      if(verbose) log(`   ✓ CUIT ${cuit} → ORGANIZACIONID ${org.ORGANIZACIONID} (${org.NOMBRE})`, 'log-ok');
-      return org.ORGANIZACIONID;
-    } else {
-      if(verbose) log(`   ⚠ CUIT ${cuit} → no encontrado en Finnegans`, 'log-warn');
-      return null;
-    }
-  }
+  // Estanar SA → no figura en la lista de clientes (es el propio tenant)
+  // Amato y Catalano SRL → CUIT 30-52673056-5 → buscar en lista
+  // Bunge → CUIT 30-70086991-8 → pendiente (no llegó en la lista)
+  // Carabajal → CUIT 27-20586874-2 → pendiente (transportista persona física)
+  // Marmetto → CUIT 20-22531460-9 → pendiente (chofer persona física)
+  // Grobocopatel → CUIT 30-55153544-0 → ORGANIZACIONID 1018
 
   const ids = {
-    solicitante:  buscarOrg(CPE.cuits.solicitante),
-    entregador:   buscarOrg(CPE.cuits.entregador),
-    destinatario: buscarOrg(CPE.cuits.destinatario),
-    destino:      buscarOrg(CPE.cuits.destino),
-    transportista:buscarOrg(CPE.cuits.transportista),
-    chofer:       buscarOrg(CPE.cuits.chofer),
-    fletePagador: buscarOrg(CPE.cuits.fletePagador),
+    solicitante:   null,   // Estanar — es el tenant, Finnegans lo resuelve solo
+    entregador:    null,   // Amato y Catalano — pendiente confirmación ID
+    destinatario:  null,   // Bunge — pendiente (no estaba en lista clientes)
+    destino:       null,   // Bunge — ídem
+    transportista: null,   // Carabajal — pendiente (persona física)
+    chofer:        null,   // Marmetto — pendiente (persona física)
+    fletePagador:  null,   // Bunge — pendiente
   };
 
-  setStep(3, 'ok', 'códigos resueltos');
+  // Log de lo que tenemos y lo que falta
+  if(verbose) {
+    log('   ⚠ Solicitante (Estanar): lo resuelve Finnegans como tenant', 'log-warn');
+    log('   ⚠ Bunge, Carabajal, Marmetto: pendientes de URL proveedores con CUIT', 'log-warn');
+    log('   ✓ Depósitos, especie, campaña, tarifario: hardcodeados correctamente', 'log-ok');
+  }
+
+  setStep(3, 'ok', 'parcial — orgs pendientes de CORS');
 
   // Armar payload
   const payload = {
