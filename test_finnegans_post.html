@@ -184,6 +184,7 @@
 
 <script>
 const FINN_BASE = 'https://api.finneg.com/api';
+const PROXY_URL = 'https://finnegans-proxy.lalessi177.workers.dev/';
 
 // Datos fijos de la CPE Marmetto
 const CPE = {
@@ -241,9 +242,24 @@ function setStep(n, estado, detalle = '') {
 function normCUIT(c) { return c ? c.replace(/-/g,'') : ''; }
 
 async function finnGet(endpoint, token) {
-  const r = await fetch(`${FINN_BASE}/${endpoint}?ACCESS_TOKEN=${token}`);
+  const r = await fetch(PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint, token, method: 'GET' })
+  });
   if (!r.ok) throw new Error(`GET ${endpoint} → HTTP ${r.status}`);
   return r.json();
+}
+
+async function finnPost(endpoint, token, payload) {
+  const r = await fetch(PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint, token, method: 'POST', payload })
+  });
+  const data = await r.json();
+  if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+  return { data, status: r.status };
 }
 
 function limpiar() {
@@ -375,31 +391,22 @@ async function ejecutar() {
     log('\n📤 POST /APITrasladosGranos...', 'log-info');
     log(JSON.stringify(payload, null, 2), '');
 
-    const resp = await fetch(
-      `${FINN_BASE}/APITrasladosGranos?ACCESS_TOKEN=${token}`,
-      {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload)
-      }
-    );
-
-    const data = await resp.json();
+    const { data, status } = await finnPost('APITrasladosGranos', token, payload);
     log('\n📥 Respuesta Finnegans:', 'log-info');
-    log(JSON.stringify(data, null, 2), resp.ok ? 'log-ok' : 'log-err');
+    log(JSON.stringify(data, null, 2), 'log-ok');
 
     const respBox = document.getElementById('resp-box');
     respBox.textContent = JSON.stringify(data, null, 2);
-    respBox.className = resp.ok && !data.error ? 'ok' : 'err';
+    respBox.className = !data.error ? 'ok' : 'err';
     respBox.style.display = 'block';
     document.getElementById('resp-card').style.display = 'block';
 
-    if (resp.ok && !data.error) {
+    if (!data.error) {
       setStep(4, 'ok', `Asiento: ${data.TransaccionID || data.status || 'OK'}`);
       log(`\n✅ ¡CP enviada exitosamente! Asiento: ${data.TransaccionID || data.status || JSON.stringify(data)}`, 'log-ok');
     } else {
-      setStep(4, 'err', data.error || `HTTP ${resp.status}`);
-      log(`\n❌ Error: ${data.error || resp.status}`, 'log-err');
+      setStep(4, 'err', data.error);
+      log(`\n❌ Error: ${data.error}`, 'log-err');
     }
 
   } catch(e) {
