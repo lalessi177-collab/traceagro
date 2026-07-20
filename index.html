@@ -796,6 +796,7 @@ function renderCpSiloCell(f, i){
   }
   let html = '<input value="'+(f.cpSilo||'')+'" placeholder="'+(f.destino==='cam'?'N° CP':'Destino')+'" onchange="updF('+i+',\'cpSilo\',this.value)" style="width:110px"/>';
   if(f.destino==='cam'){
+    html += '<button onclick="buscarCPSistemasCosecha('+i+')" title="Buscar en CP Sistemas" style="cursor:pointer;margin-left:3px;background:#1565C0;color:#fff;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;border:none">🔍 Buscar</button>';
     html += '<label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF">';
     html += '<input type="file" accept=".pdf" style="display:none" onchange="subirPDFCosecha(this,'+i+')"/>PDF</label>';
   }
@@ -1641,6 +1642,44 @@ function updT(i,campo,val){ filasTraslado[i][campo]=val; }
 function remT(i){ filasTraslado.splice(i,1); renderTraslado(); }
 
 // ── Búsqueda de CP en CP Sistemas ──
+
+async function buscarCPSistemasCosecha(i) {
+  const f = filasCosecha[i];
+  let nroCp = (f.cpSilo || '').trim().replace(/-/g, '');
+
+  if (!nroCp) {
+    showToast('⚠ Ingresá el número de CP primero', 3000);
+    return;
+  }
+
+  nroCp = nroCp.padStart(10, '0');
+  const cpParam = encodeURIComponent('"' + nroCp + '"');
+
+  showToast('🔍 Buscando CP en CP Sistemas...', 3000);
+
+  try {
+    const r = await fetch(`https://softwarecpsistemas.com.ar/a/api/gateway?token=${CP_SISTEMAS_TOKEN}&carta_porte=${cpParam}`);
+    const data = await r.json();
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      showToast('❌ CP no encontrada en CP Sistemas', 3000);
+      return;
+    }
+
+    const cp = data[0];
+    filasCosecha[i].cpSilo     = cp.carta_porte || f.cpSilo;
+    filasCosecha[i].kgH        = cp.neto        || f.kgH;
+    filasCosecha[i].chofer     = cp.nombre_chofer || f.chofer;
+    filasCosecha[i].contratista= cp.nombre_transportista || f.contratista;
+    filasCosecha[i]._cpSistemas = cp;
+
+    renderCosecha();
+    showToast(`✓ CP ${cp.carta_porte} cargada — ${cp.grano} · ${cp.neto} kg · ${cp.nombre_chofer}`, 4000);
+
+  } catch(e) {
+    showToast('❌ Error al buscar CP: ' + e.message, 4000);
+  }
+}
 const CP_SISTEMAS_TOKEN = '40548cb5592a76ddb863d5d6e0191bc3a04a24c68bc30c45b0314d787462e9c0';
 const CP_SISTEMAS_URL   = 'https://softwarecpsistemas.com.ar/a/api/gateway';
 const CP_PROXY_URL      = 'https://finnegans-proxy.lalessi177.workers.dev/';
