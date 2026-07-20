@@ -1599,7 +1599,8 @@ function renderTraslado(){
       </td>
       <td><input type="number" value="${f.kg||''}" onchange="updT(${i},'kg',this.value);actualizarSilos()" style="width:75px"/></td>
       <td>
-        <input value="${f.cp||''}" placeholder="00001-..." onchange="updT(${i},'cp',this.value)" style="width:100px"/>
+        <input id="cp-input-${i}" value="${f.cp||''}" placeholder="00001-..." onchange="updT(${i},'cp',this.value)" style="width:100px"/>
+        <button onclick="buscarCPSistemas(${i})" title="Buscar en CP Sistemas" style="cursor:pointer;margin-left:3px;background:#1565C0;color:#fff;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;border:none">🔍 Buscar</button>
         <label style="cursor:pointer;display:inline-block;margin-left:3px;background:#F5C518;color:#5c3d00;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px" title="Subir PDF Carta de Porte">
           <input type="file" accept=".pdf" style="display:none" onchange="subirPDFTraslado(this,${i})"/>PDF
         </label>${pdfData['t'+i]?'<span style="color:#3B6D11;font-size:11px;margin-left:3px">✓</span>':''}
@@ -1638,6 +1639,77 @@ async function subirPDFTraslado(input, rowIdx){
 
 function updT(i,campo,val){ filasTraslado[i][campo]=val; }
 function remT(i){ filasTraslado.splice(i,1); renderTraslado(); }
+
+// ── Búsqueda de CP en CP Sistemas ──
+const CP_SISTEMAS_TOKEN = '40548cb5592a76ddb863d5d6e0191bc3a04a24c68bc30c45b0314d787462e9c0';
+const CP_SISTEMAS_URL   = 'https://softwarecpsistemas.com.ar/a/api/gateway';
+const CP_PROXY_URL      = 'https://finnegans-proxy.lalessi177.workers.dev/';
+
+async function buscarCPSistemas(i) {
+  const f = filasTraslado[i];
+  let nroCp = (f.cp || '').trim().replace(/-/g, '');
+
+  if (!nroCp) {
+    showToast('⚠ Ingresá el número de CP primero', 3000);
+    return;
+  }
+
+  // Formatear a 10 dígitos con comillas para la API
+  nroCp = nroCp.padStart(10, '0');
+  const cpParam = `"${nroCp}"`;
+
+  showToast('🔍 Buscando CP en CP Sistemas...', 3000);
+
+  try {
+    // Llamamos via Cloudflare Worker para evitar CORS
+    const resp = await fetch(CP_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: `../${CP_SISTEMAS_URL}?token=${CP_SISTEMAS_TOKEN}&carta_porte=${cpParam}`,
+        method: 'GET',
+        useFullUrl: true
+      })
+    });
+
+    // Si el proxy no soporta URL externa, llamamos directo
+    let data;
+    try {
+      data = await resp.json();
+    } catch(e) { data = null; }
+
+    // Intentar llamada directa si el proxy falla
+    if (!data || data.error) {
+      const r2 = await fetch(`${CP_SISTEMAS_URL}?token=${CP_SISTEMAS_TOKEN}&carta_porte=${encodeURIComponent(cpParam)}`);
+      data = await r2.json();
+    }
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      showToast('❌ CP no encontrada en CP Sistemas', 3000);
+      return;
+    }
+
+    const cp = data[0];
+
+    // Rellenar campos de la fila con los datos de CP Sistemas
+    filasTraslado[i].cp          = cp.carta_porte || f.cp;
+    filasTraslado[i].kg          = cp.neto        || f.kg;
+    filasTraslado[i].destino     = cp.nombre_destino || f.destino;
+    filasTraslado[i].chofer      = cp.nombre_chofer  || f.chofer;
+    filasTraslado[i].transporte  = cp.nombre_transportista || f.transporte;
+    filasTraslado[i].contrato    = cp.contrato    || f.contrato;
+
+    // Guardar datos completos para el POST a Finnegans
+    filasTraslado[i]._cpSistemas = cp;
+
+    renderTraslado();
+    showToast(`✓ CP ${cp.carta_porte} cargada — ${cp.grano} · ${cp.neto} kg · ${cp.nombre_chofer}`, 4000);
+
+  } catch(e) {
+    console.error('Error buscando CP:', e);
+    showToast('❌ Error al buscar CP: ' + e.message, 4000);
+  }
+}
 
 // ── ENVÍO A FINNEGANS ──
 
