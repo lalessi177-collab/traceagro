@@ -1658,7 +1658,16 @@ async function buscarCPSistemasCosecha(i) {
   showToast('🔍 Buscando CP en CP Sistemas...', 3000);
 
   try {
-    const r = await fetch(`https://softwarecpsistemas.com.ar/a/api/gateway?token=${CP_SISTEMAS_TOKEN}&carta_porte=${cpParam}`);
+    const r = await fetch(CP_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        baseUrl: 'https://softwarecpsistemas.com.ar/a/api/gateway',
+        token: CP_SISTEMAS_TOKEN,
+        endpoint: `carta_porte=${cpParam}`,
+        method: 'GET'
+      })
+    });
     const data = await r.json();
 
     if (!data || !Array.isArray(data) || data.length === 0) {
@@ -1705,23 +1714,17 @@ async function buscarCPSistemas(i) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        endpoint: `../${CP_SISTEMAS_URL}?token=${CP_SISTEMAS_TOKEN}&carta_porte=${cpParam}`,
-        method: 'GET',
-        useFullUrl: true
+        baseUrl: 'https://softwarecpsistemas.com.ar/a/api/gateway',
+        token: CP_SISTEMAS_TOKEN,
+        endpoint: `carta_porte=${cpParam}`,
+        method: 'GET'
       })
     });
 
-    // Si el proxy no soporta URL externa, llamamos directo
     let data;
     try {
       data = await resp.json();
     } catch(e) { data = null; }
-
-    // Intentar llamada directa si el proxy falla
-    if (!data || data.error) {
-      const r2 = await fetch(`${CP_SISTEMAS_URL}?token=${CP_SISTEMAS_TOKEN}&carta_porte=${encodeURIComponent(cpParam)}`);
-      data = await r2.json();
-    }
 
     if (!data || !Array.isArray(data) || data.length === 0) {
       showToast('❌ CP no encontrada en CP Sistemas', 3000);
