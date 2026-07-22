@@ -1658,24 +1658,9 @@ async function buscarCPSistemasCosecha(i) {
   showToast('🔍 Buscando CP en CP Sistemas...', 3000);
 
   try {
-    const r = await fetch(CP_PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        baseUrl: 'https://softwarecpsistemas.com.ar/a/api/gateway',
-        token: CP_SISTEMAS_TOKEN,
-        endpoint: `carta_porte=${cpParam}`,
-        method: 'GET'
-      })
-    });
-    const data = await r.json();
-
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      showToast('❌ CP no encontrada en CP Sistemas', 3000);
-      return;
-    }
-
-    const cp = data[0];
+    const cp = await buscarEnCPSistemas(nroCp);
+    if (!cp) { showToast('❌ CP no encontrada', 3000); return; }
+    const dummy2 = null; // placeholder
     filasCosecha[i].cpSilo     = cp.carta_porte || f.cpSilo;
     filasCosecha[i].kgH        = cp.neto        || f.kgH;
     filasCosecha[i].chofer     = cp.nombre_chofer || f.chofer;
@@ -1689,9 +1674,39 @@ async function buscarCPSistemasCosecha(i) {
     showToast('❌ Error al buscar CP: ' + e.message, 4000);
   }
 }
-const CP_SISTEMAS_TOKEN = '40548cb5592a76ddb863d5d6e0191bc3a04a24c68bc30c45b0314d787462e9c0';
+// Tokens de CP Sistemas por zona — búsqueda en paralelo
+const CP_SISTEMAS_TOKENS = [
+  'c6a8c89f20e60c5e21537c08fe35851793ca9b94ab040de57d765fb943e8803a',  // estanareisasur
+  'fef4d2ab7a4f8fbe377f5e6d2b3c5200bc445f5394a693cf74669431db1a5418',  // estanarcortaderas
+  '40548cb5592a76ddb863d5d6e0191bc3a04a24c68bc30c45b0314d787462e9c0',  // estanareisa
+  '24a8b80008f405f0f6884204f8095e4de49b1d320d4fe485f3c403e701dbbdd7',  // EstanarVILLEGAS
+];
+const CP_SISTEMAS_TOKEN = CP_SISTEMAS_TOKENS[0]; // compatibilidad
 const CP_SISTEMAS_URL   = 'https://softwarecpsistemas.com.ar/a/api/gateway';
 const CP_PROXY_URL      = 'https://finnegans-proxy.lalessi177.workers.dev/';
+
+// Búsqueda en paralelo en todos los tokens
+async function buscarEnCPSistemas(nroCp) {
+  const cpParam = encodeURIComponent('"' + nroCp.padStart(10,'0') + '"');
+  const busquedas = CP_SISTEMAS_TOKENS.map(token =>
+    fetch(CP_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        baseUrl: 'https://softwarecpsistemas.com.ar/a/api/gateway',
+        token: token,
+        endpoint: `carta_porte=${cpParam}`,
+        method: 'GET'
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data) && data.length > 0) return data[0];
+      throw new Error('no encontrada');
+    })
+  );
+  return Promise.any(busquedas);
+}
 
 async function buscarCPSistemas(i) {
   const f = filasTraslado[i];
@@ -1706,32 +1721,12 @@ async function buscarCPSistemas(i) {
   nroCp = nroCp.padStart(10, '0');
   const cpParam = `"${nroCp}"`;
 
-  showToast('🔍 Buscando CP en CP Sistemas...', 3000);
+  showToast('🔍 Buscando CP en las 4 zonas...', 3000);
 
   try {
-    // Llamamos via Cloudflare Worker para evitar CORS
-    const resp = await fetch(CP_PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        baseUrl: 'https://softwarecpsistemas.com.ar/a/api/gateway',
-        token: CP_SISTEMAS_TOKEN,
-        endpoint: `carta_porte=${cpParam}`,
-        method: 'GET'
-      })
-    });
-
-    let data;
-    try {
-      data = await resp.json();
-    } catch(e) { data = null; }
-
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      showToast('❌ CP no encontrada en CP Sistemas', 3000);
-      return;
-    }
-
-    const cp = data[0];
+    const cp = await buscarEnCPSistemas(nroCp);
+    if (!cp) { showToast('❌ CP no encontrada', 3000); return; }
+    const dummy = null; // placeholder
 
     // Rellenar campos de la fila con los datos de CP Sistemas
     filasTraslado[i].cp          = cp.carta_porte || f.cp;
