@@ -1652,7 +1652,7 @@ async function buscarCPSistemasCosecha(i) {
     return;
   }
 
-  nroCp = nroCp.padStart(10, '0');
+  // No modificar el número — usar tal cual lo ingresó el técnico (puede ser 10 o 13 dígitos)
   const cpParam = encodeURIComponent('"' + nroCp + '"');
 
   showToast('🔍 Buscando CP en CP Sistemas...', 3000);
@@ -1687,7 +1687,7 @@ const CP_PROXY_URL      = 'https://finnegans-proxy.lalessi177.workers.dev/';
 
 // Búsqueda en paralelo en todos los tokens
 async function buscarEnCPSistemas(nroCp) {
-  const cpParam = encodeURIComponent('"' + nroCp.padStart(10,'0') + '"');
+  const cpParam = encodeURIComponent('"' + nroCp + '"');
   const busquedas = CP_SISTEMAS_TOKENS.map(token =>
     fetch(CP_PROXY_URL, {
       method: 'POST',
@@ -1717,8 +1717,6 @@ async function buscarCPSistemas(i) {
     return;
   }
 
-  // Formatear a 10 dígitos con comillas para la API
-  nroCp = nroCp.padStart(10, '0');
   const cpParam = `"${nroCp}"`;
 
   showToast('🔍 Buscando CP en las 4 zonas...', 3000);
