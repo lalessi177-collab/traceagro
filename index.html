@@ -301,7 +301,10 @@ table.traslado-table td input,table.traslado-table td select{width:100%;font-siz
                 <th style="width:80px">Kg secos</th>
                 <th style="width:100px">Destino</th>
                 <th style="width:140px">CP / Silo / Destino</th>
+                <th style="width:110px">Transportista</th>
                 <th style="width:110px">Chofer</th>
+                <th style="width:110px">Destinatario</th>
+                <th style="width:110px">Destino</th>
                 <th style="width:80px">Embolso</th>
                 <th style="width:110px">Contratista</th>
                 <th style="width:30px"></th>
@@ -757,7 +760,10 @@ function renderCosecha(){
         </select>
       </td>
       <td id="cp-td-${i}">${renderCpSiloCell(f,i)}</td>
+      <td><input value="${f.transportista||''}" onchange="updF(${i},'transportista',this.value)" style="width:105px"/></td>
       <td><input value="${f.chofer||''}" onchange="updF(${i},'chofer',this.value)" list="dl-chofer" style="width:105px"/></td>
+      <td><input value="${f.destinatario||''}" onchange="updF(${i},'destinatario',this.value)" style="width:105px"/></td>
+      <td><input value="${f.destino_nombre||''}" onchange="updF(${i},'destino_nombre',this.value)" style="width:105px"/></td>
       <td><input value="${f.embolso||''}" onchange="updF(${i},'embolso',this.value)" list="dl-embolso" style="width:75px"/></td>
       <td><input value="${f.contratista||''}" onchange="updF(${i},'contratista',this.value)" list="dl-contratista" style="width:105px"/></td>
       <td><button onclick="remF(${i})" style="background:none;border:none;color:#E24B4A;cursor:pointer;font-size:14px">✕</button></td>
@@ -1663,8 +1669,11 @@ async function buscarCPSistemasCosecha(i) {
     const dummy2 = null; // placeholder
     filasCosecha[i].cpSilo     = cp.carta_porte || f.cpSilo;
     filasCosecha[i].kgH        = cp.neto        || f.kgH;
-    filasCosecha[i].chofer     = cp.nombre_chofer || f.chofer;
-    filasCosecha[i].contratista= cp.nombre_transportista || f.contratista;
+    filasCosecha[i].chofer        = cp.nombre_chofer       || f.chofer;
+    filasCosecha[i].transportista = cp.nombre_transportista || f.transportista;
+    filasCosecha[i].destinatario  = cp.nombre_destinatario  || f.destinatario;
+    filasCosecha[i].destino_nombre= cp.nombre_destino       || f.destino_nombre;
+    // contratista lo completa el técnico manualmente — no se pisa
     filasCosecha[i]._cpSistemas = cp;
 
     renderCosecha();
